@@ -1,0 +1,18 @@
+train:
+  batch_size: 128
+  epochs: 1000
+  sample_epoch: 10
+  sample_scramble_count: 100
+  sample_cube_count: 50
+  buffer_size: 50000
+  validation_epoch: 10
+  video_path: ./video
+  model_path: ./pretrained
+  progress_path: ./train_progress
+validation:
+  max_timesteps: 1000
+  sample_scramble_count: 15
+  sample_cube_count: 3
+env:
+  cube_size: 3
+device: cpu
