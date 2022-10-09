@@ -17,6 +17,7 @@ def optim_func(model, learning_rate):
     Returns:
         optim_list: List contains value_optim, policy_optim
     """
+    # TODO MSE loss, crossentropy의 reduction은 none으로 설정(weighted loss 계산을 위함)
     pass
 
 def scheduler_func(optim_list):
@@ -69,6 +70,8 @@ def get_env_config(cube_size=3):
         -> ([7, 21], 6)
     """
     pass
+
+def weight_loss():
 
 def save_model(model, epoch, optim_list, lr_scheduler_list, model_path):
     """
@@ -157,18 +160,21 @@ def update_params(model, replay_buffer, criterion_list, optim_list, batch_size, 
         state = state.to(device)
         target_value = target_value.to(device)
         target_policy = target_policy.to(device)
-        scramble_count = scramble_count.to(device)
+        scramble_count = scramble_count.to(device) # [B]
+        reciprocal_scramble_count = torch.reciprocal(scramble_count)
 
         # update value network
         predicted_value, predicted_policy = model(state.detach())
         value_optim.zero_grad()
-        value_loss = value_criterion(predicted_value, target_value.detach())
+        value_loss = (value_criterion(predicted_value, target_value.detach()).squeeze(dim=-1) * \
+                        reciprocal_scramble_count.squeeze(dim=-1).detach()).mean()
         value_loss.backward(retain_graph=True)
         value_optim.step()
 
         # update policy network
         policy_optim.zero_grad()
-        policy_loss = policy_criterion(predicted_policy, target_policy.detach())
+        policy_loss = (policy_criterion(predicted_policy, target_policy.detach()) * \
+                        reciprocal_scramble_count.squeeze(dim=-1).detach()).mean()
         policy_loss.backward(retain_graph=True)
         policy_optim.step()
 
