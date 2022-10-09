@@ -1,5 +1,6 @@
 from collections import namedtuple
 
+
 import gym
 
 def make_env(env_name, cube_size=3):
