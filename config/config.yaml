@@ -1,5 +1,6 @@
 train:
   batch_size: 128
+  learning_rate: 0.001
   epochs: 1000
   sample_epoch: 10
   sample_scramble_count: 100

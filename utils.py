@@ -32,6 +32,7 @@ def scheduler_func(optim_list):
 def plot_progress(loss_history, save_file_path='./train_progress'):
     """
     plot train progress, x-axis: epoch, y-axis: loss
+    Example of loss_history: {1:{loss:[5.2]}, 2:{loss:[3.1]}, 3:{loss:[1.5]}, ...}
     
     Args:
         loss_history: Dictionary which contains loss
@@ -42,6 +43,7 @@ def plot_progress(loss_history, save_file_path='./train_progress'):
 def plot_valid_hist(valid_history, save_file_path='./train_progress'):
     """
     plot validation results, x-axis: scramble distance, y-axis: percentage solved
+    Example of valid_history: {1:{solve_percentage:[10, 8, 5, ...]}, 2:{solve_percentage:[30, 24, 10, ...]}, 3:{solve_percentage:[50, 35, 22, ...]}, ...}
     
     Args:
         valid_history: Dictionary which contains solved percentage for each scramble distance
@@ -68,19 +70,25 @@ def get_env_config(cube_size=3):
     """
     pass
 
-def save_model(model, epoch, model_path):
+def save_model(model, epoch, optim_list, lr_scheduler_list, model_path):
     """
     Save trained model
 
     Args:
         model: Model you want to save
         epoch: Current epoch
+        optim_list: List contains value_optim, policy_optim
+        lr_scheduler_list: List contains value, policy learning rate scheduler
+        model_path: Path to save the model
     """
     torch.save({
-        'encoder_net_state_dict' : model.encoder_net.state_dict(),
-        'policy_net_state_dict': model.policy_net.state_dict(),
-        'value_net_state_dict': model.value_net.state_dict(),
-        }, f'{model_path}/model_{epoch}.pt')
+        'epoch': epoch,
+        'model_state_dict' : model.state_dict(),
+        'value_optimizer_state_dict': optim_list[0].state_dict(),
+        'policy_optimizer_state_dict': optim_list[1].state_dict(),
+        'value_lr_scheduler': lr_scheduler_list[0].state_dict(),
+        'policy_lr_scheduler': lr_scheduler_list[1].state_dict()
+        }, f'{model_path}/checkpoint_{epoch}.pt')
 
 class ReplayBuffer(Dataset):
     def __init__(self, buf_size):

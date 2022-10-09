@@ -1,4 +1,5 @@
 import os
+import argparse
 from collections import defaultdict
 
 import yaml
@@ -7,20 +8,19 @@ import torch
 
 from model import DeepCube
 from env import make_env
-from utils import ReplayBuffer, get_env_config, loss_func, optim_func, \
+from utils import ReplayBuffer, get_env_config, loss_func, optim_func, scheduler_func,\
     update_params, plot_progress, plot_valid_hist, save_model
 
-def train(cfg):
+def train(cfg, args):
     """
-    
-
+    Train model
     """
     ############################
     # Get train configuration  #
     ############################
     device = torch.device('cuda' if cfg['device']=='cuda' and torch.cuda.is_available() else 'cpu')
-    
     batch_size = cfg['train']['batch_size']
+    learning_rate = cfg['train']['learning_rate']
     epochs = cfg['train']['epochs']
     sample_epoch = cfg['train']['sample_epoch']
     sample_scramble_count = cfg['train']['sample_scramble_count']
@@ -38,9 +38,11 @@ def train(cfg):
     ############################
     deepcube = DeepCube(state_dim, action_dim).to(device)
     env = make_env(cube_size)
+    start_epoch = 1
 
     criterion_list = loss_func()
-    optim_list = optim_func()
+    optim_list = optim_func(deepcube, learning_rate)
+    lr_scheduler_list = scheduler_func(optim_list)
 
     replay_buffer = ReplayBuffer(buffer_size, device)
     loss_history = defaultdict(lambda: {'loss':[]})
@@ -50,19 +52,30 @@ def train(cfg):
     os.makedirs(model_path, exist_ok=True)
     os.makedirs(progress_path, exist_ok=True)
 
+    if args.resume:
+        checkpoint = torch.load(args.path)
+        start_epoch = checkpoint['epoch']+1
+        deepcube.load_state_dict(checkpoint['model_state_dict'])
+        optim_list[0].load_state_dict(checkpoint['value_optimizer_state_dict'])
+        optim_list[1].load_state_dict(checkpoint['policy_optimizer_state_dict'])
+        lr_scheduler_list[0].load_state_dict(checkpoint['value_lr_scheduler'])
+        lr_scheduler_list[1].load_state_dict(checkpoint['policy_lr_scheduler'])
+    
     ############################
     #       train model        #
     ############################
-    for epoch in range(1, epochs):
-        if (epoch-1) % sample_epoch == 0:
+    for epoch in range(start_epoch, epochs+1):
+        if (epoch-1) % sample_epoch == 0: # replay buffer에 random sample저장
             env.get_random_samples(replay_buffer, sample_scramble_count, sample_cube_count)
         loss = update_params(deepcube, replay_buffer, criterion_list, optim_list, batch_size, device)
         loss_history[epoch]['loss'].append(loss)
         if (epoch-1) % validation_epoch == 0:
             validation(deepcube, env, valid_history, epoch, cfg)
             plot_valid_hist(valid_history, save_file_path=progress_path)
-            save_model(deepcube, epoch, video_path)
+            save_model(deepcube, epoch, optim_list, lr_scheduler_list, model_path)
         plot_progress(loss_history, save_file_path=progress_path)
+        for lr_scheduler in lr_scheduler_list:
+            lr_scheduler.step()
 
 def validation(model, env, valid_history, epoch, cfg):
     """
@@ -96,6 +109,10 @@ def validation(model, env, valid_history, epoch, cfg):
         valid_history[epoch]['solve_percentage'].append(solve_percentage)
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--resume', type=str, default='', help='Path to pretrained model file')
+    args = parser.parse_args()
+
     with open('./config/config.yaml') as f:
         cfg = yaml.safe_load(f)
     train(cfg)
