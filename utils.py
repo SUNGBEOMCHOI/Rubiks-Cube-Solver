@@ -71,8 +71,6 @@ def get_env_config(cube_size=3):
     """
     pass
 
-def weight_loss():
-
 def save_model(model, epoch, optim_list, lr_scheduler_list, model_path):
     """
     Save trained model
