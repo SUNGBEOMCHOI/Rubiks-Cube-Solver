@@ -2,6 +2,7 @@ from collections import deque
 
 import torch
 from torch.utils.data import Dataset, DataLoader
+import matplotlib.pyplot as plt
 
 def loss_func():
     """
@@ -17,7 +18,6 @@ def optim_func(model, learning_rate):
     Returns:
         optim_list: List contains value_optim, policy_optim
     """
-    # TODO MSE loss, crossentropy의 reduction은 none으로 설정(weighted loss 계산을 위함)
     pass
 
 def scheduler_func(optim_list):
@@ -33,18 +33,22 @@ def scheduler_func(optim_list):
 def plot_progress(loss_history, save_file_path='./train_progress'):
     """
     plot train progress, x-axis: epoch, y-axis: loss
-    Example of loss_history: {1:{loss:[5.2]}, 2:{loss:[3.1]}, 3:{loss:[1.5]}, ...}
     
     Args:
         loss_history: Dictionary which contains loss
         save_file_path: Path for saving progress graph
     """
-    pass
+    x_axis = []
+    y_axis = []
+    for i in range(len(loss_history)):
+        x_axis.append(i)
+        y_axis.append(loss_history[i]['loss'])
+    plt.plot(x_axis, y_axis)
+    plt.show()
 
 def plot_valid_hist(valid_history, save_file_path='./train_progress'):
     """
     plot validation results, x-axis: scramble distance, y-axis: percentage solved
-    Example of valid_history: {1:{solve_percentage:[10, 8, 5, ...]}, 2:{solve_percentage:[30, 24, 10, ...]}, 3:{solve_percentage:[50, 35, 22, ...]}, ...}
     
     Args:
         valid_history: Dictionary which contains solved percentage for each scramble distance
@@ -66,30 +70,24 @@ def get_env_config(cube_size=3):
     Examples:
         get_env_config(cube_size=2)
         -> ([7, 21], 6)
-        get_env_config(cube_size=3)
-        -> ([20, 24], 12)
+        get_env_config(cube_size=2)
+        -> ([7, 21], 6)
     """
     pass
 
-def save_model(model, epoch, optim_list, lr_scheduler_list, model_path):
+def save_model(model, epoch, model_path):
     """
     Save trained model
 
     Args:
         model: Model you want to save
         epoch: Current epoch
-        optim_list: List contains value_optim, policy_optim
-        lr_scheduler_list: List contains value, policy learning rate scheduler
-        model_path: Path to save the model
     """
     torch.save({
-        'epoch': epoch,
-        'model_state_dict' : model.state_dict(),
-        'value_optimizer_state_dict': optim_list[0].state_dict(),
-        'policy_optimizer_state_dict': optim_list[1].state_dict(),
-        'value_lr_scheduler': lr_scheduler_list[0].state_dict(),
-        'policy_lr_scheduler': lr_scheduler_list[1].state_dict()
-        }, f'{model_path}/checkpoint_{epoch}.pt')
+        'encoder_net_state_dict' : model.encoder_net.state_dict(),
+        'policy_net_state_dict': model.policy_net.state_dict(),
+        'value_net_state_dict': model.value_net.state_dict(),
+        }, f'{model_path}/model_{epoch}.pt')
 
 class ReplayBuffer(Dataset):
     def __init__(self, buf_size):
@@ -158,21 +156,18 @@ def update_params(model, replay_buffer, criterion_list, optim_list, batch_size, 
         state = state.to(device)
         target_value = target_value.to(device)
         target_policy = target_policy.to(device)
-        scramble_count = scramble_count.to(device) # [B]
-        reciprocal_scramble_count = torch.reciprocal(scramble_count)
+        scramble_count = scramble_count.to(device)
 
         # update value network
         predicted_value, predicted_policy = model(state.detach())
         value_optim.zero_grad()
-        value_loss = (value_criterion(predicted_value, target_value.detach()).squeeze(dim=-1) * \
-                        reciprocal_scramble_count.squeeze(dim=-1).detach()).mean()
+        value_loss = value_criterion(predicted_value, target_value.detach())
         value_loss.backward(retain_graph=True)
         value_optim.step()
 
         # update policy network
         policy_optim.zero_grad()
-        policy_loss = (policy_criterion(predicted_policy, target_policy.detach()) * \
-                        reciprocal_scramble_count.squeeze(dim=-1).detach()).mean()
+        policy_loss = policy_criterion(predicted_policy, target_policy.detach())
         policy_loss.backward(retain_graph=True)
         policy_optim.step()
 
