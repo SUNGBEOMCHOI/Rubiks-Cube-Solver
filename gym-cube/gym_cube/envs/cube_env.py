@@ -72,10 +72,13 @@ class CubeEnv(gym.Env):
     def save_video(self, env, policy, video_path):
         recorder = VideoRecorder(env=env, path=video_path, metadata={'num_turns': self.num_turns})
         state = env.reset()
-        while True:
+        num_actions = len(policy)
+        i = 0
+        while i < num_actions:
             recorder.capture_frame()
-            action = policy
+            action = policy[i]
             state, reward, done = env.step(action)
+            i += 1
             if done:
                 state = env.reset()
                 print("Saved Video")
