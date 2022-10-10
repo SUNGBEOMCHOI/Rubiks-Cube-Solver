@@ -9,3 +9,5 @@ gym_cube.egg-info/top_level.txt
 gym_cube/envs/__init__.py
 gym_cube/envs/cube_env.py
 gym_cube/envs/assets/cube.py
+gym_cube/envs/assets/cube_interactive.py
+gym_cube/envs/assets/projection.py
