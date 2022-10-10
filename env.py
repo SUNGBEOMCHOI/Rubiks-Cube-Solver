@@ -74,7 +74,7 @@ class Cube(gym.Env):
         """
         pass
 
-    def get_random_samples(self, replay_buffer, scramble_count, sample_cube_count):
+    def get_random_samples(self, replay_buffer, model, scramble_count, sample_cube_count):
         """
         Return samples which contain state, target value, target policy for training
         

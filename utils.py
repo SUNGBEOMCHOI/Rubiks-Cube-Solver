@@ -66,8 +66,8 @@ def get_env_config(cube_size=3):
     Examples:
         get_env_config(cube_size=2)
         -> ([7, 21], 6)
-        get_env_config(cube_size=2)
-        -> ([7, 21], 6)
+        get_env_config(cube_size=3)
+        -> ([20, 24], 12)
     """
     pass
 
