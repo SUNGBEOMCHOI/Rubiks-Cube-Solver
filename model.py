@@ -50,5 +50,5 @@ class DeepCube(nn.Module):
         """
         if x.dim() == 2: # batch size가 없으면
             x = x.unsqueeze(dim=0)
-        action_output = self.forward(x)
+        _, action_output = self.forward(x)
         return torch.argmax(action_output).item()
