@@ -19,27 +19,23 @@ def loss_func():
 
 def optim_func(model, learning_rate):
     """
-    Return value, policy optimizer
+    Return optimizer
     Returns:
-        optim_list: List contains value_optim, policy_optim
+        optimizer
     """
-    value_optim = optim.Adam(list(model.encoder_net.parameters()) + list(model.value_net.parameters()),
-                            lr=learning_rate)
-    policy_optim = optim.Adam(list(model.encoder_net.parameters()) + list(model.policy_net.parameters()),
-                            lr=learning_rate)
-    return [value_optim, policy_optim]
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    return optimizer
 
-def scheduler_func(optim_list):
+def scheduler_func(optimizer):
     """
     Return value, policy learning rate scheduler
     Args:
-        optim_list: List of value, policy optimizer
+        optimizer
     Returns:
-        scheduler_list: List contains value, policy learning rate scheduler
+        scheduler: learning rate scheduler
     """
-    value_lr_scheduler = optim.lr_scheduler.CyclicLR(optim_list[0], base_lr=0.0001, max_lr=0.001, step_size_up=50, step_size_down=100, mode='triangular')
-    policy_lr_scheduler = optim.lr_scheduler.CyclicLR(optim_list[1], base_lr=0.0001, max_lr=0.001, step_size_up=50, step_size_down=100, mode='triangular')
-    return [value_lr_scheduler, policy_lr_scheduler]
+    scheduler = optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.0001, max_lr=0.001, step_size_up=50, step_size_down=100, mode='triangular')
+    return scheduler
 
 def plot_progress(loss_history, save_file_path='./train_progress'):
     """
@@ -110,22 +106,22 @@ def get_env_config(cube_size=3):
     
     return state_dim, action_dim
 
-def save_model(model, epoch, optim_list, lr_scheduler_list, model_path='./pretrained'):
+def save_model(model, epoch, optimizer, lr_scheduler, model_path='./pretrained'):
     """
     Save trained model
 
     Args:
         model: Model you want to save
         epoch: Current epoch
+        optimizer
+        lr_scheduler
         model_path: Path to save model
     """
     torch.save({
         'epoch' : epoch,
         'model_state_dict' : model.state_dict(),
-        'value_optimizer_state_dict' : optim_list[0].state_dict(),
-        'policy_optimizer_state_dict' : optim_list[1].state_dict(),
-        'value_lr_scheduler' : lr_scheduler_list[0].state_dict(),
-        'policy_lr_scheduler' : lr_scheduler_list[1].state_dict()
+        'optimizer_state_dict' : optimizer.state_dict(),
+        'lr_scheduler' : lr_scheduler.state_dict(),
         }, f'{model_path}/model_{epoch}.pt')
 
 class ReplayBuffer(Dataset):
@@ -176,7 +172,7 @@ class ReplayBuffer(Dataset):
         """
         self.memory.append(x)
         
-def update_params(model, replay_buffer, criterion_list, optim_list, batch_size, device):
+def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, device):
     """
     Update model networks' parameters with replay buffer
     
@@ -184,7 +180,7 @@ def update_params(model, replay_buffer, criterion_list, optim_list, batch_size, 
         model: DeepCube model
         replay_buffer: Replay memory that contains date samples
         criterion_list: List contains value_criterion, policy_criterion
-        optim_list : criterion_list: List contains value_optimizer, policy_optimizer
+        optimizer
         batch_size
         device
 
@@ -192,7 +188,6 @@ def update_params(model, replay_buffer, criterion_list, optim_list, batch_size, 
         total_loss: sum of value loss and policy loss
     """
     value_criterion, policy_criterion = criterion_list()
-    value_optim, policy_optim = optim_list()
 
     train_dataloader = DataLoader(replay_buffer, batch_size=batch_size, shuffle=True)
     num_samples = len(replay_buffer)
@@ -204,21 +199,19 @@ def update_params(model, replay_buffer, criterion_list, optim_list, batch_size, 
         scramble_count = scramble_count.to(device)
         reciprocal_scramble_count = torch.reciprocal(scramble_count)
 
-        # update value network
         predicted_value, predicted_policy = model(state.detach())
-        value_optim.zero_grad()
+        optimizer.zero_grad()
+        # calculate value loss
         value_loss = (value_criterion(predicted_value, target_value.detach()).squeeze(dim=-1) * \
                         reciprocal_scramble_count.squeeze(dim=-1).detach()).mean()
-        value_loss.backward(retain_graph=True)
-        value_optim.step()
 
-        # update policy network
-        policy_optim.zero_grad()
+        # calculate policy loss
         policy_loss = (policy_criterion(predicted_policy, target_policy.detach()) * \
                         reciprocal_scramble_count.squeeze(dim=-1).detach()).mean()
-        policy_loss.backward(retain_graph=True)
-        policy_optim.step()
+        loss = value_loss + policy_loss
+        loss.backward()
+        optimizer.step()
 
-        total_loss = total_loss + value_loss.item() + policy_loss.item()
+        total_loss = total_loss + loss.item()
     total_loss/= num_samples
     return total_loss

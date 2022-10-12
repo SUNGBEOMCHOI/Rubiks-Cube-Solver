@@ -41,8 +41,8 @@ def train(cfg, args):
     start_epoch = 1
 
     criterion_list = loss_func()
-    optim_list = optim_func(deepcube, learning_rate)
-    lr_scheduler_list = scheduler_func(optim_list)
+    optimizer = optim_func(deepcube, learning_rate)
+    lr_scheduler = scheduler_func(optimizer)
 
     replay_buffer = ReplayBuffer(buffer_size, device)
     loss_history = defaultdict(lambda: {'loss':[]})
@@ -56,10 +56,8 @@ def train(cfg, args):
         checkpoint = torch.load(args.path)
         start_epoch = checkpoint['epoch']+1
         deepcube.load_state_dict(checkpoint['model_state_dict'])
-        optim_list[0].load_state_dict(checkpoint['value_optimizer_state_dict'])
-        optim_list[1].load_state_dict(checkpoint['policy_optimizer_state_dict'])
-        lr_scheduler_list[0].load_state_dict(checkpoint['value_lr_scheduler'])
-        lr_scheduler_list[1].load_state_dict(checkpoint['policy_lr_scheduler'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
     
     ############################
     #       train model        #
@@ -72,10 +70,9 @@ def train(cfg, args):
         if (epoch-1) % validation_epoch == 0:
             validation(deepcube, env, valid_history, epoch, cfg)
             plot_valid_hist(valid_history, save_file_path=progress_path)
-            save_model(deepcube, epoch, optim_list, lr_scheduler_list, model_path)
+            save_model(deepcube, epoch, optimizer, lr_scheduler, model_path)
         plot_progress(loss_history, save_file_path=progress_path)
-        for lr_scheduler in lr_scheduler_list:
-            lr_scheduler.step()
+        lr_scheduler.step()
 
 def validation(model, env, valid_history, epoch, cfg):
     """
