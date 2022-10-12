@@ -186,7 +186,7 @@ class Cube:
             self._move_list.append((f, n, layer))
         
         v = self.facesdict[f]
-        r = Quaternion.from_v_theta(v, n * np.pi / 2)
+        r = Quaternion.from_v_theta(v, n * np.pi / 2) 
         M = r.as_rotation_matrix()
 
         proj = np.dot(self._face_centroids[:, :3], v)
@@ -371,12 +371,12 @@ class InteractiveCube(plt.Axes):
         self._draw_cube()
 
     ####################################################
-    def _random_view(self, steps = 100, *args):
+    def _random_view(self, *args):
         self.set_xlim(self._start_xlim)
         self.set_ylim(self._start_ylim)
-        # UDLRBF
+        #  UDLRBF
         face_list = ["U", "D", "L", "R", "B", "F"]
-        for step in range(steps):
+        for step in range(50): # for mouse click
             face = face_list[np.random.randint(6)]
             layer = np.random.randint(3)
             self.rotate_face(face, 1, layer, 1)
