@@ -14,6 +14,21 @@ from gym.wrappers.monitoring.video_recorder import VideoRecorder
 '''
 UDFBRLU'D'F'B'R'L'
 01234567891011
+
+
+8 corner 3 cubelet face
+각 corner에 대해 3가지 경우의 수 존재
+한 개의 corner만 위치를 정하면 나머지 7개의 위치는 자동으로 정해짐 -> 8가지
+8 x (3 x 8)
+
+12 edge 2 cubelet face 
+각 edge에 대해 2가지 경우의 수 존재
+한 개의 edge만 위치를 정하면 나머지 11개의 위치는 자동으로 정해짐 -> 12가지
+12 x (2 x 12)
+
+cubelet에 붙어 있는 스티커 중에서 하나만 표현하면 됨
+
+target value, target policy를 빈 공간에 넣기 sample과 count를 뽑아내기
 '''
 class CubeEnv(gym.Env):
     metadata = {'render_modes': ['human', 'rgb_array',]}
@@ -40,6 +55,7 @@ class CubeEnv(gym.Env):
         degree_dict = {"U": -1, "D": -1, "F": -1, "B": -1, "R": -1, "L": -1, "U'":1, "D'": 1, "F'": 1, "B'": 1, "R'": 1, "L'": 1}
         degree = degree_dict[action]
         layer = 0
+        n = self.N * self.N
         self.cube.rotate_face(face, degree, layer)
         self.num_turns += 1
         # check done
@@ -47,9 +63,9 @@ class CubeEnv(gym.Env):
         reward = 0
         for i in range(6): # 54
             # side = self.icube._project(self.state[3])[:,:,:2][9*(i): 9*(i+1)]
-            side = self.icube._project(self.cube._stickers)[:,:,:2][9*(i): 9*(i+1)]
-            initial = self.iicube._project(self.initial_cube._stickers)[:,:,:2][9*(i): 9*(i+1)]
-            for _ in range(9):
+            side = self.icube._project(self.cube._stickers)[:,:,:2][n*(i): n*(i+1)]
+            initial = self.iicube._project(self.initial_cube._stickers)[:,:,:2][n*(i): n*(i+1)]
+            for _ in range(n):
                 done *= np.array_equal(side[_], initial[_])
                 
 
@@ -72,7 +88,7 @@ class CubeEnv(gym.Env):
             # layer = np.random.randint(3)
             degree = 1 if np.random.random() < 0.5 else -1
             self.cube.rotate_face(face, degree, 0)
-        return
+        return self.state
     
     def initialize(self):
         self.cube._initialize_arrays()
@@ -87,21 +103,20 @@ class CubeEnv(gym.Env):
             degree = 1 if np.random.random() < 0.5 else -1
             self.cube.rotate_face(face, degree, 0)
 
-    def render_mode(self):
-        # flat = mode[0]
-        # views = mode[1]
-        # self.cube.render(flat, views)
-        # self.icube._draw_cube()
-        # plt.show()
-        pass
+    # def render_mode(self):
+    #     # flat = mode[0]
+    #     # views = mode[1]
+    #     # self.cube.render(flat, views)
+    #     # self.icube._draw_cube()
+    #     # plt.show()
+    #     pass
     
-    def render(self):
+    def render(self, mode=None):
         fig = self.cube.draw_interactive()
         plt.show()
         fig.canvas.draw()
-
-        if self.render_mode is None:
-            return
+        if mode is None:
+            return None
         else:
             data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
             data = data.reshape(fig.canvas.get_width_height()[::-1]+(3,))

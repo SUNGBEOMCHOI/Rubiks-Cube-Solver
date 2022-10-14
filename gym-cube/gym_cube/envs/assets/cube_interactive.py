@@ -9,6 +9,12 @@ import matplotlib.pyplot as plt
 from matplotlib import widgets
 from gym_cube.envs.assets.projection import Quaternion, project_points
 
+import gym_cube
+import torch
+import gym
+from model import DeepCube
+from utils import get_env_config
+
 """
 Sticker representation
 ----------------------
@@ -290,6 +296,13 @@ class InteractiveCube(plt.Axes):
                          "(hold shift for counter-clockwise)",
                          size=10)
 
+        ############################################
+        # state_dim, action_dim = get_env_config(self.cube.N)
+        # self.model = DeepCube(state_dim, action_dim)
+        # self.model.load_state_dict(torch.load(PATH))
+        # self.env = gym.make('cube-v0')
+        ############################################
+
     def _initialize_widgets(self):
         # self._ax_reset = self.figure.add_axes([0.55, 0.05, 0.2, 0.075])
         # self._btn_reset = widgets.Button(self._ax_reset, 'Reset View')
@@ -302,13 +315,13 @@ class InteractiveCube(plt.Axes):
         self._btn_random.on_clicked(self._random_view)
         
 
-        # self._ax_solve = self.figure.add_axes([0.15, 0.05, 0.2, 0.075])
-        # self._btn_solve = widgets.Button(self._ax_solve, 'Solve Cube')
-        # self._btn_solve.on_clicked(self._solve_cube)
+        self._ax_solve = self.figure.add_axes([0.55, 0.05, 0.2, 0.075])
+        self._btn_solve = widgets.Button(self._ax_solve, 'Solve Cube')
+        self._btn_solve.on_clicked(self._solve_cube)
         ###############################
         # solve cube using our method
         ###############################
-        self._ax_my_solve = self.figure.add_axes([0.35, 0.05, 0.2, 0.075])
+        self._ax_my_solve = self.figure.add_axes([0.35, 0.05, 0.2, 0.075]) # left, bottom, width,height
         self._btn_my_solve = widgets.Button(self._ax_my_solve, 'Solve My Cube')
         self._btn_my_solve.on_clicked(self._my_solve_cube)
 
@@ -382,6 +395,23 @@ class InteractiveCube(plt.Axes):
             self.rotate_face(face, 1, layer, 1)
 
     def _my_solve_cube(self, *args):
+        '''
+        when the button is clicked, solve cube using trained model
+        '''
+
+        # self._project(self.cube._stickers)[:,:,2]
+        # move_list = self.cube._move_list[:]
+        # for timestep in range(len(move_list)):
+        #     with torch.no_grad():
+        #         action = self.model.get_action(state)
+        #     next_state, reward, done, info = self.env.step(action)
+        #     # self.cube.rotate_face(face. degree, layer)
+        #     # next_state = [self.cube._face_centroids, self.cube._faces, self.cube._sticker_centroids, self.cube._stickers]
+        #     if done:
+        #         break
+        #     state = next_state
+
+
         move_list = self.cube._move_list[:]
         for (face, n, layer) in move_list[::-1]:
             self.rotate_face(face, -n, layer, steps=3)

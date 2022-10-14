@@ -3,6 +3,7 @@ from collections import deque
 import torch
 from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 def loss_func():
     """
@@ -174,3 +175,16 @@ def update_params(model, replay_buffer, criterion_list, optim_list, batch_size, 
         total_loss = total_loss + value_loss.item() + policy_loss.item()
     total_loss/= num_samples
     return total_loss
+
+def save_frames_as_gif(frames, scramble_count, sample_cube_count, path='./video/'):
+    filename = f'cube_{scramble_count}_{sample_cube_count}.gif'
+    plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
+
+    patch = plt.imshow(frames[0])
+    plt.axis('off')
+
+    def animate(i):
+        patch.set_data(frames[i])
+
+    anim = animation.FuncAnimation(plt.gcf(), animate, frames = len(frames), interval=50)
+    anim.save(path + filename, writer='imagemagick', fps=2)
