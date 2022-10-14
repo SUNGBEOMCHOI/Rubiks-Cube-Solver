@@ -273,6 +273,7 @@ class InteractiveCube(plt.Axes):
         self._face_polys = None
         self._sticker_polys = None
 
+        self.frames = []
         self._draw_cube()
 
         # connect some GUI events
@@ -329,6 +330,7 @@ class InteractiveCube(plt.Axes):
         return project_points(pts, self._current_rot, self._view, [0, 1, 0])
 
     def _draw_cube(self):
+        plt.pause(0.01)
         stickers = self._project(self.cube._stickers)[:, :, :2]
         faces = self._project(self.cube._faces)[:, :, :2]
         face_centroids = self._project(self.cube._face_centroids[:, :3])
@@ -366,6 +368,12 @@ class InteractiveCube(plt.Axes):
                 self._sticker_polys[i].set_facecolor(colors[i])
 
         self.figure.canvas.draw()
+        data = np.frombuffer(self.figure.canvas.tostring_rgb(), dtype=np.uint8)
+        try:
+            data = data.reshape((1000, 1000, 3))
+            self.frames.append(data)
+        except:
+            pass
 
     def rotate(self, rot):
         self._current_rot = self._current_rot * rot
@@ -525,16 +533,17 @@ class InteractiveCube(plt.Axes):
 
 #     c = Cube(N)
 
-    # do a 3-corner swap
-    #c.rotate_face('R')
-    #c.rotate_face('D')
-    #c.rotate_face('R', -1)
-    #c.rotate_face('U', -1)
-    #c.rotate_face('R')
-    #c.rotate_face('D', -1)
-    #c.rotate_face('R', -1)
-    #c.rotate_face('U')
+#     do a 3-corner swap
+#     c.rotate_face('R')
+#     c.rotate_face('D')
+#     c.rotate_face('R', -1)
+#     c.rotate_face('U', -1)
+#     c.rotate_face('R')
+#     c.rotate_face('D', -1)
+#     c.rotate_face('R', -1)
+#     c.rotate_face('U')
 
-    # c.draw_interactive()
+#     fig = c.draw_interactive()
+#     fig.axes[3].rotate_face('R')
 
-    # plt.show()
+#     plt.show()

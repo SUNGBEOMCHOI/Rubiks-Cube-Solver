@@ -4,6 +4,7 @@ from unicodedata import name
 import gym
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import os
 from gym_cube.envs.assets.cube_interactive import InteractiveCube, Cube
 
@@ -39,6 +40,8 @@ class CubeEnv(gym.Env):
         self.N = cube_size
         self.state = [self.cube._face_centroids, self.cube._faces, self.cube._sticker_centroids, self.cube._stickers]
         self.num_turns = 0
+        self.mode = None
+        self.frames = []
 
         self.transaction = namedtuple('Point', ['state', 'target_value', 'target_policy', 'scramble_count'])
 
@@ -56,7 +59,10 @@ class CubeEnv(gym.Env):
         degree = degree_dict[action]
         layer = 0
         n = self.N * self.N
-        self.cube.rotate_face(face, degree, layer)
+        if self.mode == 'human':
+            self.fig.axes[3].rotate_face(face, degree, layer)
+        else:
+            self.cube.rotate_face(face, degree, layer)
         self.num_turns += 1
         # check done
         done = 1
@@ -87,7 +93,10 @@ class CubeEnv(gym.Env):
             face = face_list[np.random.randint(6)]
             # layer = np.random.randint(3)
             degree = 1 if np.random.random() < 0.5 else -1
-            self.cube.rotate_face(face, degree, 0)
+            if self.mode == 'human':
+                self.fig.axes[3].rotate_face(face, degree, 0)
+            else:
+                self.cube.rotate_face(face, degree, 0)
         return self.state
     
     def initialize(self):
@@ -101,7 +110,10 @@ class CubeEnv(gym.Env):
             face = face_list[np.random.randint(6)]
             # layer = np.random.randint(3)
             degree = 1 if np.random.random() < 0.5 else -1
-            self.cube.rotate_face(face, degree, 0)
+            if self.mode == 'human':
+                self.fig.axes[3].rotate_face(face, degree, 0)
+            else:
+                self.cube.rotate_face(face, degree, 0)
 
     # def render_mode(self):
     #     # flat = mode[0]
@@ -111,16 +123,9 @@ class CubeEnv(gym.Env):
     #     # plt.show()
     #     pass
     
-    def render(self, mode=None):
-        fig = self.cube.draw_interactive()
-        plt.show()
-        fig.canvas.draw()
-        if mode is None:
-            return None
-        else:
-            data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-            data = data.reshape(fig.canvas.get_width_height()[::-1]+(3,))
-            return data
+    def render(self):
+        self.fig = self.cube.draw_interactive()
+        self.mode='human'
 
 
     # def save_video(self, env, policy, video_path):
@@ -151,4 +156,29 @@ class CubeEnv(gym.Env):
             self.randomize(scramble_count = scramble_count)
             replay_buffer.append(self.state)
 
+    def save_frames_as_gif(self, cube_size, scramble_count, sample_cube_count, path='./video/'):
+        filename = f'cube{cube_size}_scramble{scramble_count}_sample{sample_cube_count}.gif'
+        self.frames = self.fig.axes[3].frames
+        plt.figure(figsize=(self.frames[0].shape[1] / 72.0, self.frames[0].shape[0] / 72.0), dpi=72)
+
+        patch = plt.imshow(self.frames[0])
+        plt.axis('off')
+
+        def animate(i):
+            patch.set_data(self.frames[i])
+        anim = animation.FuncAnimation(plt.gcf(), animate, frames = len(self.frames), interval=0)
+        anim.save(path + filename, writer='imagemagick', fps=5)
+
+
+if __name__ == '__main__':
+    e = CubeEnv(3)
+    e.render()
+    e.reset(scramble_count=10)
+    # for _ in range(10):
+    #     state, done, reward, info = e.step(2)
+    e.save_frames_as_gif(3, 1, 1)
+    # print(state)
+    # print(done)
+    # print(reward)
+    # print(info)
 
