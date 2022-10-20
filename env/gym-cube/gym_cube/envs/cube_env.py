@@ -172,11 +172,11 @@ class CubeEnv(gym.Env):
 
 if __name__ == '__main__':
     e = CubeEnv(3)
-    e.render()
-    e.reset(scramble_count=10)
+    # e.render()
+    # e.reset(scramble_count=10)
     # for _ in range(10):
     #     state, done, reward, info = e.step(2)
-    e.save_frames_as_gif(3, 1, 1)
+    # e.save_frames_as_gif(3, 1, 1)
     # print(state)
     # print(done)
     # print(reward)

@@ -12,8 +12,8 @@ from gym_cube.envs.assets.projection import Quaternion, project_points
 import gym_cube
 import torch
 import gym
-from model import DeepCube
-from utils import get_env_config
+# from model import DeepCube
+# from utils import get_env_config
 
 """
 Sticker representation
@@ -524,14 +524,14 @@ class InteractiveCube(plt.Axes):
 
                 self.figure.canvas.draw()
 
-# if __name__ == '__main__':
-#     import sys
-#     try:
-#         N = int(sys.argv[1])
-#     except:
-#         N = 3
+if __name__ == '__main__':
+    import sys
+    try:
+        N = int(sys.argv[1])
+    except:
+        N = 3
 
-#     c = Cube(N)
+    c = Cube(2)
 
 #     do a 3-corner swap
 #     c.rotate_face('R')
@@ -543,7 +543,7 @@ class InteractiveCube(plt.Axes):
 #     c.rotate_face('R', -1)
 #     c.rotate_face('U')
 
-#     fig = c.draw_interactive()
-#     fig.axes[3].rotate_face('R')
+    fig = c.draw_interactive()
+    # fig.axes[3].rotate_face('R')
 
-#     plt.show()
+    plt.show()
