@@ -1,0 +1,7 @@
+*.pyc
+__pycache__
+*.swp
+build
+dist
+pycuber.egg-info
+venv
