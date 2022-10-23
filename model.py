@@ -7,8 +7,8 @@ class DeepCube(nn.Module):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.encoder_net = nn.Sequential(
-            nn.Flatten(start_dim = 0, end_dim = -1),
-            nn.Linear(20*24,  4096),
+            nn.Flatten(),
+            nn.Linear(self.state_dim[0]*self.state_dim[1],  4096),
             nn.ELU(),
             nn.Linear(4096, 2048),
             nn.ELU()
@@ -16,7 +16,7 @@ class DeepCube(nn.Module):
         self.policy_net = nn.Sequential(
             nn.Linear(2048, 512),
             nn.ELU(),
-            nn.Linear(512, 12)
+            nn.Linear(512, self.action_dim)
         )
         self.value_net = nn.Sequential(
             nn.Linear(2048, 512),
@@ -27,7 +27,6 @@ class DeepCube(nn.Module):
     def forward(self, x):
         """
         Return action output and state values corresponding input states
-
         Args:
             x: input state of size [batch_size, state_dim[0], state_dim[1]]
         Returns:
@@ -42,11 +41,12 @@ class DeepCube(nn.Module):
     def get_action(self, x):
         """
         Return action corresponding input states
-
         Args:
             x: input state of size [state_dim[0], state_dim[1]]
         Returns:
             action: Integer of action
         """
-        action_output = forward(x)[1]
-        return torch.argmax(action_output)
+        if x.dim() == 2: # batch size가 없으면
+            x = x.unsqueeze(dim=0)
+        _, action_output = self.forward(x)
+        return torch.argmax(action_output).item()

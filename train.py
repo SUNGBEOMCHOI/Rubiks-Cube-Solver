@@ -8,11 +8,8 @@ import torch
 
 from model import DeepCube
 from env import make_env
-from utils import ReplayBuffer, get_env_config, loss_func, optim_func, save_frames_as_gif, scheduler_func,\
+from utils import ReplayBuffer, get_env_config, loss_func, optim_func, scheduler_func,\
     update_params, plot_progress, plot_valid_hist, save_model
-
-from gym.wrappers.monitoring.video_recorder import VideoRecorder
-
 
 def train(cfg, args):
     """
@@ -44,8 +41,8 @@ def train(cfg, args):
     start_epoch = 1
 
     criterion_list = loss_func()
-    optim_list = optim_func(deepcube, learning_rate)
-    lr_scheduler_list = scheduler_func(optim_list)
+    optimizer = optim_func(deepcube, learning_rate)
+    lr_scheduler = scheduler_func(optimizer)
 
     replay_buffer = ReplayBuffer(buffer_size, device)
     loss_history = defaultdict(lambda: {'loss':[]})
@@ -59,31 +56,27 @@ def train(cfg, args):
         checkpoint = torch.load(args.path)
         start_epoch = checkpoint['epoch']+1
         deepcube.load_state_dict(checkpoint['model_state_dict'])
-        optim_list[0].load_state_dict(checkpoint['value_optimizer_state_dict'])
-        optim_list[1].load_state_dict(checkpoint['policy_optimizer_state_dict'])
-        lr_scheduler_list[0].load_state_dict(checkpoint['value_lr_scheduler'])
-        lr_scheduler_list[1].load_state_dict(checkpoint['policy_lr_scheduler'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
     
     ############################
     #       train model        #
     ############################
-    for epoch in range(start_epoch, epochs+1): # epoch: 1000
+    for epoch in range(start_epoch, epochs+1):
         if (epoch-1) % sample_epoch == 0: # replay buffer에 random sample저장
             env.get_random_samples(replay_buffer, sample_scramble_count, sample_cube_count)
         loss = update_params(deepcube, replay_buffer, criterion_list, optim_list, batch_size, device)
         loss_history[epoch]['loss'].append(loss)
-        if (epoch-1) % validation_epoch == 0: # valid epochs: 10
+        if (epoch-1) % validation_epoch == 0:
             validation(deepcube, env, valid_history, epoch, cfg)
             plot_valid_hist(valid_history, save_file_path=progress_path)
-            save_model(deepcube, epoch, optim_list, lr_scheduler_list, model_path)
+            save_model(deepcube, epoch, optimizer, lr_scheduler, model_path)
         plot_progress(loss_history, save_file_path=progress_path)
-        for lr_scheduler in lr_scheduler_list:
-            lr_scheduler.step()
+        lr_scheduler.step()
 
 def validation(model, env, valid_history, epoch, cfg):
     """
     Validate model, Solve scrambled cubes with trained model and save video
-
     Args:
         model: trained DeepCube model
         env: Cube environment
@@ -96,21 +89,16 @@ def validation(model, env, valid_history, epoch, cfg):
     sample_cube_count = cfg['validation']['sample_cube_count']
     seed = [i for i in range(sample_cube_count)]
     # TODO: 비디오 저장이 가능하도록
-    # video start
-    video_path = './video/'
     for scramble_count in range(1, sample_scramble_count+1):
         solve_count = 0
         for idx in sample_cube_count:
             state, done = env.reset(seed, scramble_count), False
-            frames = []
             for timestep in range(1, max_timesteps+1):
                 with torch.no_grad():
                     action = model.get_action(state)
                 next_state, reward, done, info = env.step(action)
                 if done:
                     solve_count += 1
-                    # video end
-                    save_frames_as_gif(frames, scramble_count, sample_cube_count, path=video_path)
                     break
                 state = next_state
         solve_percentage = (solve_count/sample_cube_count) * 100
