@@ -3,13 +3,15 @@
 # Written by Jake Vanderplas
 # Adapted from cube code written by David Hogg
 #   https://github.com/davidwhogg/MagicCube
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__)))
 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import widgets
-from gym_cube.envs.assets.projection import Quaternion, project_points
+from projection import Quaternion, project_points
 
-import gym_cube
 import torch
 import gym
 # from model import DeepCube

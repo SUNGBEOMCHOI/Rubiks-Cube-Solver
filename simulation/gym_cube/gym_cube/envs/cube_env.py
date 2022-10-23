@@ -1,12 +1,13 @@
-from tkinter.messagebox import NO
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__)))
+
 from typing import Optional
-from unicodedata import name
 import gym
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-import os
-from gym_cube.envs.assets.cube_interactive import InteractiveCube, Cube
+from assets.cube_interactive import InteractiveCube, Cube
 
 from collections import namedtuple
 from gym.wrappers.monitoring.video_recorder import VideoRecorder
