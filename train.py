@@ -31,7 +31,7 @@ def train(cfg, args):
     model_path = cfg['train']['model_path']
     progress_path = cfg['train']['progress_path']
     cube_size = cfg['env']['cube_size']
-    state_dim, action_dim = get_env_config(cube_size=3)
+    state_dim, action_dim = get_env_config(cube_size)
 
     ############################
     #      Train settings      #
@@ -44,7 +44,7 @@ def train(cfg, args):
     optimizer = optim_func(deepcube, learning_rate)
     lr_scheduler = scheduler_func(optimizer)
 
-    replay_buffer = ReplayBuffer(buffer_size, device)
+    replay_buffer = ReplayBuffer(buffer_size)
     loss_history = defaultdict(lambda: {'loss':[]})
     valid_history = defaultdict(lambda: {'solve_percentage':[]})
 
@@ -64,8 +64,8 @@ def train(cfg, args):
     ############################
     for epoch in range(start_epoch, epochs+1):
         if (epoch-1) % sample_epoch == 0: # replay buffer에 random sample저장
-            env.get_random_samples(replay_buffer, sample_scramble_count, sample_cube_count)
-        loss = update_params(deepcube, replay_buffer, criterion_list, optim_list, batch_size, device)
+            env.get_random_samples(replay_buffer, deepcube, sample_scramble_count, sample_cube_count)
+        loss = update_params(deepcube, replay_buffer, criterion_list, optimizer, batch_size, device)
         loss_history[epoch]['loss'].append(loss)
         if (epoch-1) % validation_epoch == 0:
             validation(deepcube, env, valid_history, epoch, cfg)
@@ -77,7 +77,6 @@ def train(cfg, args):
 def validation(model, env, valid_history, epoch, cfg):
     """
     Validate model, Solve scrambled cubes with trained model and save video
-
     Args:
         model: trained DeepCube model
         env: Cube environment
@@ -92,16 +91,23 @@ def validation(model, env, valid_history, epoch, cfg):
     # TODO: 비디오 저장이 가능하도록
     for scramble_count in range(1, sample_scramble_count+1):
         solve_count = 0
-        for idx in sample_cube_count:
-            state, done = env.reset(seed, scramble_count), False
+        for idx in range(1, sample_cube_count+1):
+            if idx == sample_cube_count and scramble_count==sample_scramble_count: # 마지막 state
+                # env.render()
+                pass
+            state, done = env.reset(seed[idx-1], scramble_count), False
             for timestep in range(1, max_timesteps+1):
                 with torch.no_grad():
-                    action = model.get_action(state)
+                    state_tensor = torch.tensor(state).float().detach()
+                    action = model.get_action(state_tensor)
                 next_state, reward, done, info = env.step(action)
                 if done:
                     solve_count += 1
                     break
                 state = next_state
+            if idx == sample_cube_count and scramble_count==sample_scramble_count: # 마지막 state render종료
+                # env.close_render()
+                pass
         solve_percentage = (solve_count/sample_cube_count) * 100
         valid_history[epoch]['solve_percentage'].append(solve_percentage)
 
@@ -112,4 +118,4 @@ if __name__ == "__main__":
 
     with open('./config/config.yaml') as f:
         cfg = yaml.safe_load(f)
-    train(cfg)
+    train(cfg, args)

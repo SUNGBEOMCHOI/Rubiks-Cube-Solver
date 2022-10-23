@@ -34,7 +34,7 @@ def scheduler_func(optimizer):
     Returns:
         scheduler: learning rate scheduler
     """
-    scheduler = optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.0001, max_lr=0.001, step_size_up=50, step_size_down=100, mode='triangular')
+    scheduler = optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.001, max_lr=0.01, step_size_up=20, step_size_down=40, mode='triangular', cycle_momentum=False)
     return scheduler
 
 def plot_progress(loss_history, save_file_path='./train_progress'):
@@ -57,7 +57,8 @@ def plot_progress(loss_history, save_file_path='./train_progress'):
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.savefig(f'{save_file_path}/{epoch}_train.png')
-    plt.show()
+    # plt.show()
+    plt.close()
 
 def plot_valid_hist(valid_history, save_file_path='./train_progress'):
     """
@@ -67,28 +68,29 @@ def plot_valid_hist(valid_history, save_file_path='./train_progress'):
         valid_history: Dictionary which contains solved percentage for each scramble distance
         save_file_path: Path for saving progress graph
     """
-    for epoch, solve_percentage in valid_history.items():
-        scramble_count_list = np.array(1, len(solve_percentage)+1, dtype=np.int32)
-        solve_percentage_list = np.array(solve_percentage['solve_percentage'])
+    max_scramble_count = len(valid_history[1]['solve_percentage'])
+    plot_epoch_list = np.unique(np.linspace(1, len(valid_history), num=5, dtype=int))
+    scramble_count_list = np.arange(1, max_scramble_count+1)
+    for epoch in plot_epoch_list:
+        solve_percentage_list = np.array(valid_history[epoch]['solve_percentage'])
         plt.plot(scramble_count_list, solve_percentage_list, label=str(epoch))
     plt.title('Solve percentage')
     plt.xlabel('Scramble count')
     plt.ylabel('Solve percentage')
     plt.legend()
     plt.savefig(f'{save_file_path}/{epoch}_solve_percentage.png')
-    plt.show()
+    # plt.show()
+    plt.close()
 
 def get_env_config(cube_size=3):
     """
     Return state dimension and action dimension corresponding cube size
-
     Args:
         cube_size:
     
     Returns:
         state_dim: List of [number of cublets, possible locations]
         action_dim: Number of actions you can take
-
     Examples:
         get_env_config(cube_size=2)
         -> ([7, 21], 6)
@@ -109,7 +111,6 @@ def get_env_config(cube_size=3):
 def save_model(model, epoch, optimizer, lr_scheduler, model_path='./pretrained'):
     """
     Save trained model
-
     Args:
         model: Model you want to save
         epoch: Current epoch
@@ -137,7 +138,6 @@ class ReplayBuffer(Dataset):
     def __len__(self):
         """
         Return length of replay memory
-
         Returns:
             Length of replay memory        
         """
@@ -146,10 +146,8 @@ class ReplayBuffer(Dataset):
     def __getitem__(self, idx):
         """
         Get samples the sample corresponding to the index
-
         Args:
             idx: index of sample you want to get
-
         Returns:
             state_tensor: Torch tensor of state of shape [state_dim]
             target_value_tensor: Torch tensor of target value of shape [1]
@@ -183,11 +181,10 @@ def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, d
         optimizer
         batch_size
         device
-
     Returns:
         total_loss: sum of value loss and policy loss
     """
-    value_criterion, policy_criterion = criterion_list()
+    value_criterion, policy_criterion = criterion_list
 
     train_dataloader = DataLoader(replay_buffer, batch_size=batch_size, shuffle=True)
     num_samples = len(replay_buffer)
@@ -199,7 +196,8 @@ def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, d
         scramble_count = scramble_count.to(device)
         reciprocal_scramble_count = torch.reciprocal(scramble_count)
 
-        predicted_value, predicted_policy = model(state.detach())
+        predicted_value, predicted_policy = model(state.float().detach())
+        predicted_value, predicted_policy = predicted_value.squeeze(dim=-1), predicted_policy.squeeze(dim=-1)
         optimizer.zero_grad()
         # calculate value loss
         value_loss = (value_criterion(predicted_value, target_value.detach()).squeeze(dim=-1) * \

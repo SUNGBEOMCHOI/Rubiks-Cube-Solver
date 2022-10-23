@@ -27,13 +27,14 @@ class DeepCube(nn.Module):
     def forward(self, x):
         """
         Return action output and state values corresponding input states
-
         Args:
             x: input state of size [batch_size, state_dim[0], state_dim[1]]
         Returns:
             value: Torch tensor of state value of size [batch_size, 1]
             action_output: Torch tensor of action probability of size [batch_size, action_dim]
         """
+        if x.dim() == 2: # batch size가 없으면
+            x = x.unsqueeze(dim=0)
         x = self.encoder_net(x)
         value = self.value_net(x)
         action_output = self.policy_net(x)
@@ -42,7 +43,6 @@ class DeepCube(nn.Module):
     def get_action(self, x):
         """
         Return action corresponding input states
-
         Args:
             x: input state of size [state_dim[0], state_dim[1]]
         Returns:
@@ -51,4 +51,5 @@ class DeepCube(nn.Module):
         if x.dim() == 2: # batch size가 없으면
             x = x.unsqueeze(dim=0)
         _, action_output = self.forward(x)
+
         return torch.argmax(action_output).item()
