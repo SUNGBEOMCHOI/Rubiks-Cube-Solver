@@ -33,6 +33,8 @@ class DeepCube(nn.Module):
             value: Torch tensor of state value of size [batch_size, 1]
             action_output: Torch tensor of action probability of size [batch_size, action_dim]
         """
+        if x.dim() == 2: # batch size가 없으면
+            x = x.unsqueeze(dim=0)
         x = self.encoder_net(x)
         value = self.value_net(x)
         action_output = self.policy_net(x)
