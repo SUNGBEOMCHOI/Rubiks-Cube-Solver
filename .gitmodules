@@ -1,6 +1,0 @@
-[submodule "py222"]
-	path = simulation/py222
-	url = https://github.com/MeepMoop/py222.git
-[submodule "PyCuber"]
-	path = simulation/PyCuber
-	url = https://github.com/adrianliaw/PyCuber.git
