@@ -5,7 +5,7 @@ train:
   sample_epoch: 1
   sample_scramble_count: 20
   sample_cube_count: 100
-  buffer_size: 5000
+  buffer_size: 10000
   validation_epoch: 10
   video_path: ./video
   model_path: ./pretrained

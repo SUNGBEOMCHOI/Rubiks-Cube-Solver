@@ -4,7 +4,7 @@ from collections import namedtuple
 import numpy as np
 import gym
 
-from simulation.py222.py222 import initState, getOP, doMove, isSolved, new_normFC, printCube
+from simulation.py222.py222 import initState, getOP, doMove, isSolved
 from simulation.gym_cube.gym_cube.envs.assets.cube_interactive import Cube as RenderCube
 from utils import *
 from model import DeepCube

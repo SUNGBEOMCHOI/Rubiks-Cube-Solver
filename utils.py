@@ -34,7 +34,7 @@ def scheduler_func(optimizer):
     Returns:
         scheduler: learning rate scheduler
     """
-    scheduler = optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.001, max_lr=0.01, step_size_up=20, step_size_down=40, mode='triangular', cycle_momentum=False)
+    scheduler = optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.0005, max_lr=0.005, step_size_up=20, step_size_down=40, mode='triangular', cycle_momentum=False)
     return scheduler
 
 def plot_progress(loss_history, save_file_path='./train_progress'):
@@ -69,7 +69,7 @@ def plot_valid_hist(valid_history, save_file_path='./train_progress'):
         save_file_path: Path for saving progress graph
     """
     max_scramble_count = len(valid_history[1]['solve_percentage'])
-    plot_epoch_list = np.unique(np.linspace(1, len(valid_history), num=5, dtype=int))
+    plot_epoch_list = np.unique(np.linspace(0, len(valid_history)-0.001, num=5, dtype=int))*10+1
     scramble_count_list = np.arange(1, max_scramble_count+1)
     for epoch in plot_epoch_list:
         solve_percentage_list = np.array(valid_history[epoch]['solve_percentage'])

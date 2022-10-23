@@ -71,7 +71,7 @@ def train(cfg, args):
             validation(deepcube, env, valid_history, epoch, cfg)
             plot_valid_hist(valid_history, save_file_path=progress_path)
             save_model(deepcube, epoch, optimizer, lr_scheduler, model_path)
-        plot_progress(loss_history, save_file_path=progress_path)
+            plot_progress(loss_history, save_file_path=progress_path)
         lr_scheduler.step()
 
 def validation(model, env, valid_history, epoch, cfg):
