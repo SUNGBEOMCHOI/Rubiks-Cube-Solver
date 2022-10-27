@@ -6,6 +6,7 @@ train:
   sample_scramble_count: 20
   sample_cube_count: 100
   buffer_size: 10000
+  temperature: 0.3
   validation_epoch: 10
   video_path: ./video
   model_path: ./pretrained
@@ -16,4 +17,8 @@ validation:
   sample_cube_count: 5
 env:
   cube_size: 2
+model:
+  - 256
+  - 64
+  - 32
 device: cpu

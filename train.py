@@ -3,6 +3,7 @@ import argparse
 from collections import defaultdict
 
 import yaml
+from tqdm import tqdm
 import numpy as np
 import torch
 
@@ -26,17 +27,19 @@ def train(cfg, args):
     sample_scramble_count = cfg['train']['sample_scramble_count']
     sample_cube_count = cfg['train']['sample_cube_count']
     buffer_size = cfg['train']['buffer_size']
+    temperature = cfg['train']['temperature']
     validation_epoch = cfg['train']['validation_epoch']
     video_path = cfg['train']['video_path']
     model_path = cfg['train']['model_path']
     progress_path = cfg['train']['progress_path']
     cube_size = cfg['env']['cube_size']
     state_dim, action_dim = get_env_config(cube_size)
+    hidden_dim = cfg['model']['hidden_dim']
 
     ############################
     #      Train settings      #
     ############################
-    deepcube = DeepCube(state_dim, action_dim).to(device)
+    deepcube = DeepCube(state_dim, action_dim, hidden_dim).to(device)
     env = make_env(cube_size)
     start_epoch = 1
 
@@ -62,10 +65,10 @@ def train(cfg, args):
     ############################
     #       train model        #
     ############################
-    for epoch in range(start_epoch, epochs+1):
+    for epoch in tqdm(range(start_epoch, epochs+1)):
         if (epoch-1) % sample_epoch == 0: # replay buffer에 random sample저장
             env.get_random_samples(replay_buffer, deepcube, sample_scramble_count, sample_cube_count)
-        loss = update_params(deepcube, replay_buffer, criterion_list, optimizer, batch_size, device)
+        loss = update_params(deepcube, replay_buffer, criterion_list, optimizer, batch_size, device, temperature)
         loss_history[epoch]['loss'].append(loss)
         if (epoch-1) % validation_epoch == 0:
             validation(deepcube, env, valid_history, epoch, cfg)

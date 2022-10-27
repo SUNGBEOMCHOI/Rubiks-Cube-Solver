@@ -2,26 +2,27 @@ import torch
 import torch.nn as nn
 
 class DeepCube(nn.Module):
-    def __init__(self, state_dim, action_dim):
+    def __init__(self, state_dim, action_dim, hidden_dim):
         super(DeepCube, self).__init__()
         self.state_dim = state_dim
         self.action_dim = action_dim
+        self.hidden_dim = hidden_dim
         self.encoder_net = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(self.state_dim[0]*self.state_dim[1],  4096),
+            nn.Linear(self.state_dim[0]*self.state_dim[1],  self.hidden_dim[0]),
             nn.ELU(),
-            nn.Linear(4096, 2048),
+            nn.Linear(self.hidden_dim[0], self.hidden_dim[1]),
             nn.ELU()
         )
         self.policy_net = nn.Sequential(
-            nn.Linear(2048, 512),
+            nn.Linear(self.hidden_dim[1], self.hidden_dim[2]),
             nn.ELU(),
-            nn.Linear(512, self.action_dim)
+            nn.Linear(self.hidden_dim[2], self.action_dim)
         )
         self.value_net = nn.Sequential(
-            nn.Linear(2048, 512),
+            nn.Linear(self.hidden_dim[1], self.hidden_dim[2]),
             nn.ELU(),
-            nn.Linear(512, 1)
+            nn.Linear(self.hidden_dim[2], 1)
         )
 
     def forward(self, x):

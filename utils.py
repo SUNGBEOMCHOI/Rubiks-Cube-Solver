@@ -170,7 +170,7 @@ class ReplayBuffer(Dataset):
         """
         self.memory.append(x)
         
-def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, device):
+def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, device, temperature=0.3):
     """
     Update model networks' parameters with replay buffer
     
@@ -181,6 +181,8 @@ def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, d
         optimizer
         batch_size
         device
+        temperature: Constant of scramble count weight
+                     0 -> all scramble count has same weight, Large temperature has large difference weight
     Returns:
         total_loss: sum of value loss and policy loss
     """
@@ -194,7 +196,7 @@ def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, d
         target_value = target_value.to(device)
         target_policy = target_policy.to(device)
         scramble_count = scramble_count.to(device)
-        reciprocal_scramble_count = torch.reciprocal(scramble_count)
+        reciprocal_scramble_count = torch.pow(torch.reciprocal(scramble_count), temperature)
 
         predicted_value, predicted_policy = model(state.float().detach())
         predicted_value, predicted_policy = predicted_value.squeeze(dim=-1), predicted_policy.squeeze(dim=-1)
