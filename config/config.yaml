@@ -18,7 +18,8 @@ validation:
 env:
   cube_size: 2
 model:
-  - 256
-  - 64
-  - 32
+  hidden_dim:
+    - 256
+    - 64
+    - 32
 device: cpu
