@@ -17,3 +17,6 @@ validation:
 env:
   cube_size: 2
 device: cpu
+mcts:
+  numMCTSSim: 50
+  cpuct: 1.0
