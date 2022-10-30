@@ -19,7 +19,7 @@ class MCTS():
         game : 
         nnet : trained neural network
         cfg : configuration(numMCTSSims, cpuct)
-
+        
         """
 
         self.game = game
