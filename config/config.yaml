@@ -1,9 +1,10 @@
 train:
   batch_size: 128
+  sample_size: 500
   learning_rate: 0.01
   epochs: 1000
   sample_epoch: 1
-  sample_scramble_count: 20
+  sample_scramble_count: 10
   sample_cube_count: 100
   buffer_size: 10000
   temperature: 0.3
@@ -13,7 +14,7 @@ train:
   progress_path: ./train_progress
 validation:
   max_timesteps: 200
-  sample_scramble_count: 20
+  sample_scramble_count: 10
   sample_cube_count: 5
 env:
   cube_size: 2

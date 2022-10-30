@@ -21,6 +21,7 @@ def train(cfg, args):
     ############################
     device = torch.device('cuda' if cfg['device']=='cuda' and torch.cuda.is_available() else 'cpu')
     batch_size = cfg['train']['batch_size']
+    sample_size = cfg['train']['sample_size']
     learning_rate = cfg['train']['learning_rate']
     epochs = cfg['train']['epochs']
     sample_epoch = cfg['train']['sample_epoch']
@@ -47,7 +48,7 @@ def train(cfg, args):
     optimizer = optim_func(deepcube, learning_rate)
     lr_scheduler = scheduler_func(optimizer)
 
-    replay_buffer = ReplayBuffer(buffer_size)
+    replay_buffer = ReplayBuffer(buffer_size, sample_size)
     loss_history = defaultdict(lambda: {'loss':[]})
     valid_history = defaultdict(lambda: {'solve_percentage':[]})
 
@@ -67,7 +68,7 @@ def train(cfg, args):
     ############################
     for epoch in tqdm(range(start_epoch, epochs+1)):
         if (epoch-1) % sample_epoch == 0: # replay buffer에 random sample저장
-            env.get_random_samples(replay_buffer, deepcube, sample_scramble_count, sample_cube_count)
+            env.get_random_samples(replay_buffer, deepcube, sample_scramble_count, sample_cube_count, temperature)
         loss = update_params(deepcube, replay_buffer, criterion_list, optimizer, batch_size, device, temperature)
         loss_history[epoch]['loss'].append(loss)
         if (epoch-1) % validation_epoch == 0:
