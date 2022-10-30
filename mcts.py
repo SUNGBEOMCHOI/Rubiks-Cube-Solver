@@ -13,19 +13,20 @@ class MCTS():
     This class handles the MCTS tree.
     """
 
-    def __init__(self, game, nnet, cfg):
+    def __init__(self, game, model, cfg):
 
         """
         game : 
-        nnet : trained neural network
+        model : trained neural network
         cfg : configuration(numMCTSSims, cpuct)
-        
         """
 
         self.game = game
-        self.nnet = nnet
+        self.model = model
         self.numMCTSSim = cfg['mcts']['numMCTSSim']
         self.cpuct = cfg['mcts']['cpuct']
+        self.action_dim = 6
+
         self.Qsa = {}  # stores Q values for s,a (as defined in the paper)
         self.Nsa = {}  # stores #times edge s,a was visited
         self.Ns = {}  # stores #times board s was visited
@@ -37,6 +38,8 @@ class MCTS():
         """
         This function performs numMCTSSims simulations of MCTS starting from
         canonicalBoard.
+        Args:
+            canonicalBoard : numpy array which represent state  (7,21)
 
         Returns:
             probs: a policy vector where the probability of the ith action is
@@ -47,8 +50,8 @@ class MCTS():
         for i in range(self.numMCTSSim):
             self.search(canonicalBoard)
 
-        s = self.game.stringRepresentation(canonicalBoard)
-        counts = [self.Nsa[(s, a)] if (s, a) in self.Nsa else 0 for a in range(self.game.getActionSize())]
+        s = np.array2string(canonicalBoard)
+        counts = [self.Nsa[(s, a)] if (s, a) in self.Nsa else 0 for a in range(self.action_dim)]
 
         if temp == 0:
             bestAs = np.array(np.argwhere(counts == np.max(counts))).flatten()
@@ -62,7 +65,7 @@ class MCTS():
         probs = [x / counts_sum for x in counts]
         return probs
 
-    def search(self, canonicalBoard):
+    def search(self, canonicalBoard, game_ended = False):
         """
         This function performs one iteration of MCTS. It is recursively called
         till a leaf node is found. The action chosen at each node is one that
@@ -78,23 +81,27 @@ class MCTS():
         state. This is done since v is in [-1,1] and if v is the value of a
         state for the current player, then its value is -v for the other player.
 
+        Args:
+            canonicalBoard : numpy array which represent state  (7,21)
+            game_ended : Boolean type
+
         Returns:
-            v: the negative of the value of the current canonicalBoard
+            v: the negative of the value of the current canonicalBoard (if canonicalBoard is terminal, return 1)
         """
 
-        s = self.game.stringRepresentation(canonicalBoard)
+        s = np.array2string(canonicalBoard)
 
         if s not in self.Es:
-            self.Es[s] = self.game.getGameEnded(canonicalBoard, 1)
+            self.Es[s] = game_ended
 
-        if self.Es[s] != 0:
+        if self.Es[s]:
             # terminal node is found
-            return -self.Es[s]
+            return 1
 
 
         if s not in self.Ps:
             # leaf node is found
-            self.Ps[s], v = self.nnet.predict(canonicalBoard)
+            v, self.Ps[s] = self.model.predict(canonicalBoard)
 
             self.Ns[s] = 0
             return -v
@@ -103,7 +110,7 @@ class MCTS():
         best_act = -1
 
         # pick the action with the highest upper confidence bound
-        for a in range(self.game.getActionSize()):
+        for a in range(self.action_dim):
             if (s, a) in self.Qsa:
                 u = self.Qsa[(s, a)] + self.cpuct * self.Ps[s][a] * math.sqrt(self.Ns[s]) / (
                         1 + self.Nsa[(s, a)])
@@ -115,10 +122,11 @@ class MCTS():
                 best_act = a
 
         a = best_act
-        next_s, next_player = self.game.getNextState(canonicalBoard, 1, a)
-        next_s = self.game.getCanonicalForm(next_s, next_player)
+        next_s, _, done, _ = self.game.step(a)
 
-        v = self.search(next_s)
+        #next_s,  next_player = self.game.step(a)
+
+        v = self.search(next_s, game_ended=done)
 
         if (s, a) in self.Qsa:
             self.Qsa[(s, a)] = (self.Nsa[(s, a)] * self.Qsa[(s, a)] + v) / (self.Nsa[(s, a)] + 1)
