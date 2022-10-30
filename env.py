@@ -4,7 +4,7 @@ from collections import namedtuple
 import numpy as np
 import gym
 
-from simulation.py222.py222 import initState, getOP, doMove, isSolved, new_normFC, printCube
+from simulation.py222.py222 import initState, getOP, doMove, isSolved, printCube
 from simulation.gym_cube.gym_cube.envs.assets.cube_interactive import Cube as RenderCube
 from utils import *
 from model import DeepCube
@@ -56,6 +56,7 @@ class Cube(gym.Env):
         Return:
             Initial state shape [number of cublets, possible locations]
         """
+        
         self.init_state()
         origin_state = np.random.get_state()
         if seed is not None:
