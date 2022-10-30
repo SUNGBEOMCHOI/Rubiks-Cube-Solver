@@ -16,7 +16,7 @@ class MCTS():
     def __init__(self, game, model, cfg):
 
         """
-        game : 
+        game : cube class
         model : trained neural network
         cfg : configuration(numMCTSSims, cpuct)
         """
@@ -34,7 +34,7 @@ class MCTS():
 
         self.Es = {}  # stores game.getGameEnded ended for board s
 
-    def getActionProb(self, canonicalBoard, temp=1):
+    def getActionProb(self, canonicalBoard, temp=0):
         """
         This function performs numMCTSSims simulations of MCTS starting from
         canonicalBoard.
@@ -43,7 +43,7 @@ class MCTS():
 
         Returns:
             probs: a policy vector where the probability of the ith action is
-                   proportional to Nsa[(s,a)]**(1./temp)
+                   proportional to Nsa[(s,a)]**(1./temp)   , list type
         """
 
         # numMCTSSims : number of MCTS simulations
@@ -51,9 +51,11 @@ class MCTS():
             self.search(canonicalBoard)
 
         s = np.array2string(canonicalBoard)
-        counts = [self.Nsa[(s, a)] if (s, a) in self.Nsa else 0 for a in range(self.action_dim)]
+        counts = [self.Nsa[(s, a)] if (s, a) in self.Nsa else 0 for a in range(self.action_dim)] #(6,) list  number of times that (s,a) was visited
 
+        
         if temp == 0:
+            #greedy
             bestAs = np.array(np.argwhere(counts == np.max(counts))).flatten()
             bestA = np.random.choice(bestAs)
             probs = [0] * len(counts)
