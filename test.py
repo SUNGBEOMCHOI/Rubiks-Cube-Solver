@@ -2,6 +2,8 @@ import argparse
 from collections import defaultdict
 import torch
 import os
+import time
+import numpy as np
 
 import yaml
 
@@ -13,84 +15,125 @@ def test(cfg, mode = 'show'):
     """
     Test our model
     Args:
-        cfg: Which contains validation configuration
-        mode: Either viewing directly or saving videos
+        cfg: Which contains trial configuration
+        mode: show(directly pop up video) or save(save test result graphs)
     """
-
     device = torch.device('cuda' if cfg['device']=='cuda' and torch.cuda.is_available() else 'cpu')
     cube_size = 3 # cfg['test]['cube_size']
-    video_path = './video/test' # cfg['test]['video_path']
-    model_path = './pretrained'# cfg['test]['model_path']
-    progress_path = '' # cfg['test]['progress_path']
-
-    epochs = 1000 # cfg['test]['epochs']
     state_dim, action_dim = get_env_config(cube_size)
-
-    test_history = defaultdict(lambda: {'solve_percentage':[]})
-
     deepcube = DeepCube(state_dim, action_dim).to(device) # load model
     env = make_env(cube_size) # make environment
-    start_epoch = 1
 
-    os.makedirs(video_path, exist_ok=True)
-    os.makedirs(model_path, exist_ok=True)
-    os.makedirs(progress_path, exist_ok=True)
+    if mode == 'save':
+        plot_test_solve_percentage()
+        plot_test_time_distribution()
+    elif mode == 'show': # mode = 'show'
+        pass
+    else : # show랑 save 둘다 아님
+        pass
 
-    for epoch in range(start_epoch, epochs+1):
-        trial(deepcube, env, test_history, epoch, cfg)
-        plot_test_hist(test_history, save_file_path=progress_path)
-        if mode == 'show': # View directly
-            pass
-        else : # Save videos
-            pass
-    pass
-
-progress_path = ''
-def plot_test_hist(test_history, save_file_path=progress_path):
+def trial(model, env, cfg, trial_scramble_count, seed):
     """
-    Make histogram of test results
-    Args:
-        test_history: Dictionary to store results
-        save_file_path: path which saves videos
-    """
-    pass
+    Try to solve a cube with given state
 
-def trial(model, env, test_history, epoch, cfg):
-    """
-    Try to solve scrambled cubes with trained model and save video
     Args:
         model: trained DeepCube model
         env: Cube environment
-        test_history: Dictionary to store results
-        epoch: Current epoch
-        cfg: Which contains validation configuration
+        cfg: Which contains trial configuration
+        trial_scramble_count: scramble count
+        seed: seed to apply scrambling cube
+    
+    Returns:
+        solve_count: count to solve a cube  
+        solve_time: time to solve a cube (sec)
+        trial_result: True or False
     """
     max_timesteps = 1000
-    test_scramble_count = 1000
-    test_cube_count = 640
-    seed = [i for i in range(test_cube_count)]
-    # TODO: 비디오 저장이 가능하도록
-    for scramble_count in range(1, test_scramble_count+1):
-        solve_count = 0
-        for idx in range(1, test_cube_count+1):
-            if idx == test_cube_count and scramble_count == test_scramble_count: # 마지막 state
-                # env.render()
-                pass
-            state, done = env.reset(seed[idx-1], scramble_count), False
-            for timestep in range(1, max_timesteps+1):
-                with torch.no_grad():
-                    state_tensor = torch.tensor(state).float().detach()
-                    action = model.get_action(state_tensor)
-                next_state, reward, done, info = env.step(action)
-                if done:
-                    solve_count += 1
-                    break
-                state = next_state
-            if idx == test_cube_count and scramble_count==test_scramble_count: # 마지막 state render종료
-                # env.close_render()
-                pass
-        solve_percentage = (solve_count/test_cube_count) * 100
-        test_history[epoch]['solve_percentage'].append(solve_percentage)
+
+    state, done = env.reset(seed, trial_scramble_count), False
+    start_time = time.time()
+    for timestep in range(1, max_timesteps+1):
+        with torch.no_grad():
+            state_tensor = torch.tensor(state).float().detach()
+            action = model.get_action(state_tensor)
+        next_state, reward, done, info = env.step(action)
+        if done:
+            solve_count = timestep
+            solve_time = time.time() - start_time
+            trial_result = 1
+            break
+        state = next_state
+
+        if timestep == max_timesteps + 1:
+            solve_count = timestep
+            solve_time = time.time() - start_time
+            trial_result = 0
+
+    return solve_count, solve_time, trial_result
+
+def plot_test_solve_percentage():
+    """
+    """
+    save_file_path = 'video'
+    os.makedirs(save_file_path, exist_ok = True)
+    scramble_distance = 30
+    trial_scramble_count = 50
+
+    solve_count_table = np.zeros((scramble_distance, trial_scramble_count))
+    solve_time_table = np.zeros((scramble_distance, trial_scramble_count))
+    trial_result_table = np.zeros((scramble_distance, trial_scramble_count))
+    
+    for distance in scramble_distance: # 움직인 횟수 별로
+        for scramble_count in trial_scramble_count: # 1,2,3,,, 50개의 큐브
+            seed = scramble_count
+            trial(deepcube, env, cfg, trial_scramble_count, seed)
+            
+            solve_count_table[distance][scramble_count] = solve_count
+            solve_time_table[distance][scramble_count] = solve_time
+            trial_result_table[distance][scramble_count] = trial_result
+
+    scramble_distance_list = [i for i in range(scramble_distance)]
+    solve_count_list = [trial_result_table[distance].mean() * 100 for distance in range(scramble_distance)]
+    plt.plot(scramble_distance_list, solve_count_list, 'r--')
+    plt.title('Difficulty vs Solve Percentage')
+    plt.xlabel('Scramble Distance')
+    plt.ylabel('Percentage solved')
+    plt.legend()
+    plt.xticks(np.linspace(0, 30, 5, endpoint = True))
+    plt.yticks(np.linspace(0, 100, 5, endpoint = True))
+    plt.savefig(f'{save_file_path}/Difficulty vs Solve Percentage.png')
+
+def plot_test_time_distribution():
+    """
+    """
+    save_file_path = 'video'
+    os.makedirs(save_file_path, exist_ok = True)
+    scramble_distance = 1000
+    trial_scramble_count = 640
+
+    solve_count_table = np.zeros(trial_scramble_count)
+    solve_time_table = np.zeros(trial_scramble_count)
+    trial_result_table = np.zeros(trial_scramble_count)
+    
+    for scramble_count in trial_scramble_count: # 1,2,3,,, 640개의 큐브
+        seed = scramble_count # 시드 정해야 함
+        trial(model, env, cfg, trial_scramble_count, seed)
+
+        solve_count_table[scramble_count] = solve_count
+        solve_time_table[scramble_count] = solve_time
+        trial_result_table[scramble_count] = trial_result
+
+    solve_time_list = trial_result_table
+    plt.hist(solve_time_list, bins = 30, color = 'red')
+    plt.axvline(solve_time_list.mean(), color = 'grey', linestyle = '--', label = 'median')
+    plt.title('Distribution of Solve Time')
+    plt.xlabel('Minutes')
+    plt.ylabel('Number of cubes')
+    plt.legend()
+    plt.xticks(np.linspace(0, 60, 6, endpoint = True))
+    plt.yticks(np.linspace(0, 100, 5, endpoint = True))
+    plt.savefig(f'{save_file_path}/Distribution of Solve Time.png')
+    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
