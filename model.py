@@ -53,3 +53,16 @@ class DeepCube(nn.Module):
         _, action_output = self.forward(x)
 
         return torch.argmax(action_output).item()
+
+    def predict(self, x):
+        """
+        Return action and value corresponding input states
+        Args:
+            x: input state of size [state_dim[0], state_dim[1]]
+        Returns:
+            value : integer of value  size:(action_dim,)
+            action : policy vector    size:(1,)
+        """
+        value, policy = self.forward(x)
+
+        return value.numpy()[0], policy.numpy()[0]
