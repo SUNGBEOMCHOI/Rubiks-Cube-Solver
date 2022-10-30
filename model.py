@@ -58,11 +58,12 @@ class DeepCube(nn.Module):
         """
         Return action and value corresponding input states
         Args:
-            x: input state of size [state_dim[0], state_dim[1]]
+            x: input state of size [state_dim[0], state_dim[1]], tensor
         Returns:
             value : integer of value  size:(action_dim,)
             action : policy vector    size:(1,)
         """
+        x = torch.tensor(x).float().detach()
         value, policy = self.forward(x)
 
         return value.numpy()[0], policy.numpy()[0]
