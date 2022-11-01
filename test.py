@@ -160,7 +160,7 @@ def plot_test_distribution_and_dispersion(model, env, cfg):
     # plt.show()
 
     plt.figure(figsize = (6,6))
-    plt.boxplot(solve_count_table)
+    plt.boxplot(solve_count_table[~np.isnan(solve_count_table)])
     plt.title('Dispersion of Scramble Counts')
     plt.xlabel('Model')
     plt.ylabel('Number of moves')
