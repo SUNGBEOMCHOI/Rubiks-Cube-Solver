@@ -2,7 +2,7 @@ train:
   batch_size: 256
   sample_size: 10000
   learning_rate: 0.001
-  epochs: 2000
+  epochs: 10000
   sample_epoch: 1
   sample_scramble_count: 30
   sample_cube_count: 100

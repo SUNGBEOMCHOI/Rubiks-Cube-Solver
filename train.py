@@ -11,7 +11,6 @@ from model import DeepCube
 from env import make_env
 from utils import ReplayBuffer, get_env_config, loss_func, optim_func, scheduler_func,\
     update_params, plot_progress, plot_valid_hist, save_model
-from mcts import MCTS
 
 def train(cfg, args):
     """
@@ -73,13 +72,13 @@ def train(cfg, args):
         loss = update_params(deepcube, replay_buffer, criterion_list, optimizer, batch_size, device, temperature)
         loss_history[epoch]['loss'].append(loss)
         if epoch % validation_epoch == 0:
-            validation(deepcube, env, valid_history, epoch, cfg)
+            validation(deepcube, env, valid_history, epoch, device, cfg)
             plot_valid_hist(valid_history, save_file_path=progress_path, validation_epoch=validation_epoch)
             save_model(deepcube, epoch, optimizer, lr_scheduler, model_path)
             plot_progress(loss_history, save_file_path=progress_path)
         lr_scheduler.step()
 
-def validation(model, env, valid_history, epoch, cfg):
+def validation(model, env, valid_history, epoch, device, cfg):
     """
     Validate model, Solve scrambled cubes with trained model and save video
     Args:
@@ -103,7 +102,7 @@ def validation(model, env, valid_history, epoch, cfg):
             state, done = env.reset(seed[idx-1], scramble_count), False
             for timestep in range(1, max_timesteps+1):
                 with torch.no_grad():
-                    state_tensor = torch.tensor(state).float().detach()
+                    state_tensor = torch.tensor(state).float().to(device).detach()
                     action = model.get_action(state_tensor)
                 next_state, reward, done, info = env.step(action)
                 if done:
