@@ -4,13 +4,13 @@ from collections import namedtuple
 import numpy as np
 import gym
 
-from simulation.py222.py222 import initState, getOP, doMove, isSolved
+from simulation.py222.py222 import initState, getOP, doMove, isSolved, getStickers, printCube
 from simulation.gym_cube.gym_cube.envs.assets.cube_interactive import Cube as RenderCube
 from utils import *
 from model import DeepCube
 
 
-def make_env(cube_size=3):
+def make_env(device, cube_size=3):
     """
     Make gym environment
     Args:
@@ -21,11 +21,11 @@ def make_env(cube_size=3):
     """
     # TODO: gym make 할때 cube size를 넣어서 큐브를 생성
     # env = gym.make(env_name, cube_size)
-    env = Cube(cube_size)
+    env = Cube(device, cube_size)
     return env
 
 class Cube(gym.Env):
-    def __init__(self, cube_size=3, device='cpu'):
+    def __init__(self, device, cube_size=3):
         """
         Gym environment for cube
 
@@ -188,7 +188,7 @@ class Cube(gym.Env):
             raise NotImplementedError
         return state
 
-    def state_to_sim_state(self):
+    def state_to_sim_state(self, state):
         """
         Return simulation state from our state
 
@@ -196,8 +196,12 @@ class Cube(gym.Env):
             Numpy array of simulation state
         """
         if self.cube_size == 2:
-            # sim_state = self.cube
-            raise NotImplementedError
+            sim_state = np.zeros((7, 2), dtype=np.int32)
+            for cubelet, state_position in enumerate(state):
+                state_position = np.where(state_position==1.0)[0][0]
+                position, position_idx = state_position//3, state_position%3
+                sim_state[position] = [cubelet, position_idx]
+            sim_state = getStickers(sim_state)
         elif self.cube_size == 3:
             raise NotImplementedError
         else:
@@ -227,6 +231,8 @@ class Cube(gym.Env):
                 next_state = self.sim_state_to_state(next_sim_cube)
                 if isSolved(next_sim_cube):
                     reward = 1.0
+                    target_value, target_policy = 1.0, action
+                    break
                 else:
                     reward = -1.0
                 next_state_list.append(next_state)
@@ -235,29 +241,37 @@ class Cube(gym.Env):
                 raise NotImplementedError
             else:
                 raise NotImplementedError
-        next_state_tensor = torch.tensor(np.array(next_state_list), device=self.device).float() # action_dim, state_dim[0], state_dim[1]
-        reward_tensor = torch.tensor(reward_list, device = self.device) # action_dim
-        with torch.no_grad():
-            next_value, _ = model(next_state_tensor)
-            value = next_value.squeeze(dim=-1).detach() + reward_tensor
-        target_value, target_policy = torch.max(value, -1, keepdim=True)
+        if reward != 1.0:
+            next_state_tensor = torch.tensor(np.array(next_state_list), device=self.device).float() # action_dim, state_dim[0], state_dim[1]
+            reward_tensor = torch.tensor(reward_list, device = self.device) # action_dim
+            with torch.no_grad():
+                next_value, _ = model(next_state_tensor)
+                value = next_value.squeeze(dim=-1).detach() + reward_tensor
+            target_value, target_policy = torch.max(value, -1, keepdim=True)
+            target_value, target_policy = target_value.item(), target_policy.item()
         weight = scramble_count ** (-1*temperature)
         with torch.no_grad():
             state_tensor = torch.tensor(self.cube, device=self.device).float()
             value, _ = model(state_tensor)
-            error = abs(value.detach().item() - target_value.item()) 
-        return target_value.item(), target_policy.item(), error
+            error = abs(value.detach().item() - target_value)
+        return target_value, target_policy, error
 
 if __name__ == "__main__":
     import time
     deepcube = DeepCube([7, 21], 6, [256, 64, 32])
-    cube = Cube(cube_size=2)
+    cube = Cube('cpu', cube_size=2)
     replay_buffer = ReplayBuffer(500, 50)
     t = torch.randn((128, 7, 21))
-    a = time.time()
+    # a = time.time()
     # for _ in range(80):
     #     deepcube(t)
     # for _ in range(12000):
     #     cube.sim_state_to_state(cube.sim_cube)
     cube.get_random_samples(replay_buffer, deepcube, sample_scramble_count=20, sample_cube_count=100, temperature=0.3)
-    print(time.time() - a)
+    # print(time.time() - a)
+    # print(cube.sim_cube)
+    # op = getOP(cube.sim_cube)
+    # print(op)
+    # print(getStickers(op))
+    # print(cube.state_to_sim_state(cube.cube))
+    

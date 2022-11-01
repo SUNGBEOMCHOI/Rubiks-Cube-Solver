@@ -11,6 +11,7 @@ from model import DeepCube
 from env import make_env
 from utils import ReplayBuffer, get_env_config, loss_func, optim_func, scheduler_func,\
     update_params, plot_progress, plot_valid_hist, save_model
+from mcts import MCTS
 
 def train(cfg, args):
     """
@@ -41,7 +42,7 @@ def train(cfg, args):
     #      Train settings      #
     ############################
     deepcube = DeepCube(state_dim, action_dim, hidden_dim).to(device)
-    env = make_env(cube_size)
+    env = make_env(device, cube_size)
     start_epoch = 1
 
     criterion_list = loss_func()
@@ -71,7 +72,7 @@ def train(cfg, args):
             env.get_random_samples(replay_buffer, deepcube, sample_scramble_count, sample_cube_count, temperature)
         loss = update_params(deepcube, replay_buffer, criterion_list, optimizer, batch_size, device, temperature)
         loss_history[epoch]['loss'].append(loss)
-        if (epoch-1) % validation_epoch == 0:
+        if epoch % validation_epoch == 0:
             validation(deepcube, env, valid_history, epoch, cfg)
             plot_valid_hist(valid_history, save_file_path=progress_path, validation_epoch=validation_epoch)
             save_model(deepcube, epoch, optimizer, lr_scheduler, model_path)
@@ -91,7 +92,7 @@ def validation(model, env, valid_history, epoch, cfg):
     max_timesteps = cfg['validation']['max_timesteps']
     sample_scramble_count = cfg['validation']['sample_scramble_count']
     sample_cube_count = cfg['validation']['sample_cube_count']
-    seed = [i for i in range(sample_cube_count)]
+    seed = [i*10 for i in range(sample_cube_count)]
     # TODO: 비디오 저장이 가능하도록
     for scramble_count in range(1, sample_scramble_count+1):
         solve_count = 0

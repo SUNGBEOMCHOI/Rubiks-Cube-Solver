@@ -34,7 +34,7 @@ def scheduler_func(optimizer):
     Returns:
         scheduler: learning rate scheduler
     """
-    scheduler = optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.0005, max_lr=0.005, step_size_up=20, step_size_down=40, mode='triangular', cycle_momentum=False)
+    scheduler = optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.0001, max_lr=0.005, step_size_up=20, step_size_down=40, mode='triangular', cycle_momentum=False)
     return scheduler
 
 def plot_progress(loss_history, save_file_path='./train_progress'):
@@ -69,8 +69,8 @@ def plot_valid_hist(valid_history, save_file_path='./train_progress', validation
         save_file_path: Path for saving progress graph
         validation_epoch
     """
-    max_scramble_count = len(valid_history[1]['solve_percentage'])
-    plot_epoch_list = np.unique(np.linspace(0, len(valid_history)-0.001, num=5, dtype=int))*validation_epoch+1
+    max_scramble_count = len(valid_history[validation_epoch]['solve_percentage'])
+    plot_epoch_list = np.unique(np.linspace(1, len(valid_history)+0.001, num=5, dtype=int))*validation_epoch
     scramble_count_list = np.arange(1, max_scramble_count+1)
     for epoch in plot_epoch_list:
         solve_percentage_list = np.array(valid_history[epoch]['solve_percentage'])
@@ -185,10 +185,6 @@ class ReplayBuffer(Dataset):
             x: Input
         """
         self.memory.append(x)
-        # if len(self.error_memory) == self.buf_size:
-        #     self.sum_error = self.sum_error + x.error - self.error_memory[0]
-        # else:
-        #     self.sum_error = self.sum_error + x.error
         self.error_memory.append(x.error)
 
     def update(self, idx, error):
@@ -230,16 +226,16 @@ def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, d
         target_policy = target_policy.to(device)
         scramble_count = scramble_count.to(device)
         reciprocal_scramble_count = torch.pow(torch.reciprocal(scramble_count), temperature)
-
+        
         predicted_value, predicted_policy = model(state.float().detach())
         predicted_value, predicted_policy = predicted_value.squeeze(dim=-1), predicted_policy.squeeze(dim=-1)
         optimizer.zero_grad()
         # calculate value loss
-        loss = value_criterion(predicted_value, target_value.detach()).squeeze(dim=-1) * \
-                        reciprocal_scramble_count.squeeze(dim=-1).detach()
+        loss = value_criterion(predicted_value, target_value.detach()).squeeze(dim=-1)
+                        
         for loss_idx, memory_idx in enumerate(memory_idxs):
             replay_buffer.update(memory_idx, loss[loss_idx].item())
-        value_loss = loss.mean()
+        value_loss = (loss*reciprocal_scramble_count.squeeze(dim=-1).detach()).mean()
 
         # calculate policy loss
         policy_loss = (policy_criterion(predicted_policy, target_policy.detach()) * \
@@ -249,11 +245,5 @@ def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, d
         optimizer.step()
 
         total_loss = total_loss + loss.item()
-    # li = [0]*11
-    # for count in scramble_count:
-    #     li[count] += 1
-    # print(li)
-    print(scramble_count)
-    print(target_value)
     total_loss/= num_samples
     return total_loss
