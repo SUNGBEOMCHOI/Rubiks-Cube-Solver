@@ -13,9 +13,9 @@ train:
   model_path: ./pretrained
   progress_path: ./train_progress
 validation:
-  max_timesteps: 50
-  sample_scramble_count: 10
-  sample_cube_count: 5
+  max_timesteps: 200
+  sample_scramble_count: 30
+  sample_cube_count: 10
 env:
   cube_size: 2
 model:
