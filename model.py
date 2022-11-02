@@ -1,27 +1,29 @@
 import torch
 import torch.nn as nn
+from torch.distributions import Categorical
 
 class DeepCube(nn.Module):
-    def __init__(self, state_dim, action_dim):
+    def __init__(self, state_dim, action_dim, hidden_dim):
         super(DeepCube, self).__init__()
         self.state_dim = state_dim
         self.action_dim = action_dim
+        self.hidden_dim = hidden_dim
         self.encoder_net = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(self.state_dim[0]*self.state_dim[1],  4096),
+            nn.Linear(self.state_dim[0]*self.state_dim[1],  self.hidden_dim[0]),
             nn.ELU(),
-            nn.Linear(4096, 2048),
+            nn.Linear(self.hidden_dim[0], self.hidden_dim[1]),
             nn.ELU()
         )
         self.policy_net = nn.Sequential(
-            nn.Linear(2048, 512),
+            nn.Linear(self.hidden_dim[1], self.hidden_dim[2]),
             nn.ELU(),
-            nn.Linear(512, self.action_dim)
+            nn.Linear(self.hidden_dim[2], self.action_dim)
         )
         self.value_net = nn.Sequential(
-            nn.Linear(2048, 512),
+            nn.Linear(self.hidden_dim[1], self.hidden_dim[2]),
             nn.ELU(),
-            nn.Linear(512, 1)
+            nn.Linear(self.hidden_dim[2], 1)
         )
 
     def forward(self, x):
@@ -51,5 +53,22 @@ class DeepCube(nn.Module):
         if x.dim() == 2: # batch size가 없으면
             x = x.unsqueeze(dim=0)
         _, action_output = self.forward(x)
+        # action_probs = torch.nn.functional.softmax(action_output)
+        # m = Categorical(action_probs)
+        # action = m.sample().item()
+        action = torch.argmax(action_output).item()
+        return action
 
-        return torch.argmax(action_output).item()
+    def predict(self, x):
+        """
+        Return action and value corresponding input states
+        Args:
+            x: input state of size [state_dim[0], state_dim[1]], tensor
+        Returns:
+            value : integer of value  size:(action_dim,)
+            action : policy vector    size:(1,)
+        """
+        x = torch.tensor(x).float().detach()
+        value, policy = self.forward(x)
+
+        return value.numpy()[0], policy.numpy()[0]
