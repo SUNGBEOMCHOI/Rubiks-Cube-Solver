@@ -26,7 +26,6 @@ class MCTS():
         self.numMCTSSim = cfg['mcts']['numMCTSSim']
         self.cpuct = cfg['mcts']['cpuct']
         self.action_dim = 6
-        self.tree_depth = 0
 
         self.Qsa = {}  # stores Q values for s,a (as defined in the paper)
         self.Nsa = {}  # stores #times edge s,a was visited
@@ -54,12 +53,10 @@ class MCTS():
             self.search(canonicalBoard)
 
             self.game = copy.deepcopy(self.initial_game)
-            self.tree_depth = 0
 
-            
 
         s = np.array2string(canonicalBoard)
-        counts = [self.Nsa[(s, a)] if (s, a) in self.Nsa else 0 for a in range(self.action_dim)] #(6,) list  number of times that (s,a) was visited
+        counts = [self.Nsa[(0, s, a)] if (0, s, a) in self.Nsa else 0 for a in range(self.action_dim)] #(6,) list  number of times that (s,a) was visited
 
         
         if temp == 0:
@@ -70,12 +67,13 @@ class MCTS():
             probs[bestA] = 1
             return probs
 
+
         counts = [x ** (1. / temp) for x in counts]
         counts_sum = float(sum(counts))
         probs = [x / counts_sum for x in counts]
         return probs
 
-    def search(self, canonicalBoard, game_ended = False):
+    def search(self, canonicalBoard, depth=0, game_ended = False):
         """
         This function performs one iteration of MCTS. It is recursively called
         till a leaf node is found. The action chosen at each node is one that
@@ -101,19 +99,20 @@ class MCTS():
 
         s = np.array2string(canonicalBoard)
 
-        if s not in self.Es:
-            self.Es[(self.tree_depth, s)] = game_ended
+        if (depth, s) not in self.Es:
+            self.Es[(depth, s)] = game_ended
+    
 
-        if self.Es[(self.tree_depth, s)]:
+        if self.Es[(depth, s)]:
             # terminal node is found
             return 1
 
 
-        if s not in self.Ps:
+        if (depth, s) not in self.Ps:
             # leaf node is found
-            v, self.Ps[(self.tree_depth, s)] = self.model.predict(canonicalBoard)
+            v, self.Ps[(depth, s)] = self.model.predict(canonicalBoard)
 
-            self.Ns[(self.tree_depth, s)] = 0
+            self.Ns[(depth, s)] = 0
             return -v
 
         cur_best = -float('inf')
@@ -121,11 +120,11 @@ class MCTS():
 
         # pick the action with the highest upper confidence bound
         for a in range(self.action_dim):
-            if (self.tree_depth, s, a) in self.Qsa:
-                u = self.Qsa[(self.tree_depth, s, a)] + self.cpuct * self.Ps[(self.tree_depth, s)][a] * math.sqrt(self.Ns[(self.tree_depth, s)]) / (
-                        1 + self.Nsa[(self.tree_depth, s, a)])
+            if (depth, s, a) in self.Qsa:
+                u = self.Qsa[(depth, s, a)] + self.cpuct * self.Ps[(depth, s)][a] * math.sqrt(self.Ns[(depth, s)]) / (
+                        1 + self.Nsa[(depth, s, a)])
             else:
-                u = self.cpuct * self.Ps[(self.tree_depth, s)][a] * math.sqrt(self.Ns[(self.tree_depth, s)] + EPS)  # Q = 0 ?
+                u = self.cpuct * self.Ps[(depth, s)][a] * math.sqrt(self.Ns[(depth, s)] + EPS)  # Q = 0 ?
 
             if u > cur_best:
                 cur_best = u
@@ -134,17 +133,16 @@ class MCTS():
         a = best_act
         next_s, _, done, _ = self.game.step(a)
 
-        self.recursion_count += 1
 
-        v = self.search(next_s, game_ended=done)
+        v = self.search(next_s, depth+1, game_ended=done)
 
-        if (s, a) in self.Qsa:
-            self.Qsa[(self.tree_depth, s, a)] = (self.Nsa[(self.tree_depth, s, a)] * self.Qsa[(self.tree_depth, s, a)] + v) / (self.Nsa[(self.tree_depth, s, a)] + 1)
-            self.Nsa[(self.tree_depth, s, a)] += 1
+        if (depth, s, a) in self.Qsa:
+            self.Qsa[(depth, s, a)] = (self.Nsa[(depth, s, a)] * self.Qsa[(depth, s, a)] + v) / (self.Nsa[(depth, s, a)] + 1)
+            self.Nsa[(depth, s, a)] += 1
 
         else:
-            self.Qsa[(self.tree_depth, s, a)] = v
-            self.Nsa[(self.tree_depth, s, a)] = 1
+            self.Qsa[(depth, s, a)] = v
+            self.Nsa[(depth, s, a)] = 1
 
-        self.Ns[(self.tree_depth, s)] += 1
+        self.Ns[(depth, s)] += 1
         return -v
