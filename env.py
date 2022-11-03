@@ -254,7 +254,6 @@ class Cube(gym.Env):
             state_tensor = torch.tensor(self.cube, device=self.device).float()
             value, _ = model(state_tensor)
             error = abs(value.detach().item() - target_value)
-        error = 0.0
         return target_value, target_policy, error
 
 if __name__ == "__main__":
