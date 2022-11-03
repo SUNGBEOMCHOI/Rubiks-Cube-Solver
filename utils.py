@@ -256,3 +256,49 @@ def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, d
         total_loss = total_loss + loss.item()
     total_loss/= num_samples
     return total_loss
+
+def plot_per(file_path):
+    """
+    Plot per result, x-axis:epoch, y-axis:number of samples
+    
+    Args:
+        file_path: String of file path which contains per results
+    """
+    sample_counts = {}
+    moving_average_index = 60
+    with open(file_path, 'r') as f:
+        while True:
+            line = f.readline()
+            if not line:
+                break
+            epoch = int(line)
+            num_counts = list(map(int, f.readline().split(' ')[:-1]))
+            sample_counts[epoch] = num_counts
+    scramble_count = len(sample_counts[1])
+    epochs = len(sample_counts)
+    epoch_list = np.arange(1, epochs+1)
+    count_dict = defaultdict(list)
+    plot_scramble_count_list = [1, 2, 3, 4, 5, 6, 7]
+    for scramble_count in plot_scramble_count_list:
+        for epoch, count in sample_counts.items():
+            count_dict[scramble_count].append(count[scramble_count-1])
+    mv_count_dict = defaultdict(list)
+    for scramble_count in plot_scramble_count_list:
+        count_list = np.array(count_dict[scramble_count])
+        for i in range(1, moving_average_index+1):
+            mv_count_dict[scramble_count].append(np.sum(count_list[0:i])/i)
+        for i in range(epochs-moving_average_index):
+            mv_count_dict[scramble_count].append(np.sum(count_list[i:i+moving_average_index])/moving_average_index)
+        plt.plot(epoch_list, np.array(mv_count_dict[scramble_count]), label=f'{scramble_count}')
+    plt.title('PER results')
+    plt.xlabel('Epochs')
+    plt.ylabel('Sample counts')
+    plt.legend() 
+    # plt.savefig(f'{save_file_path}/{epoch}_solve_percentage.png')
+    plt.show()
+    plt.close()
+
+    
+
+if __name__ == "__main__":
+    plot_per('./per_count.txt')
