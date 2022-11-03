@@ -67,9 +67,6 @@ def train(cfg, args):
     #       train model        #
     ############################
     for epoch in tqdm(range(start_epoch, epochs+1)):
-        f = open('count.txt', 'a')
-        f.write(f'{epoch}\n')
-        f.close()
         if (epoch-1) % sample_epoch == 0: # replay buffer에 random sample저장
             env.get_random_samples(replay_buffer, deepcube, sample_scramble_count, sample_cube_count, temperature)
         loss = update_params(deepcube, replay_buffer, criterion_list, optimizer, batch_size, device, temperature)

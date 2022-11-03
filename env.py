@@ -1,4 +1,4 @@
-import math
+import copy
 from collections import namedtuple
 
 import numpy as np
@@ -224,31 +224,43 @@ class Cube(gym.Env):
         """
         reward_list = []
         next_state_list = []
-        for action in range(self.action_dim):
-            if self.cube_size == 2:
-                sim_action = self.action_to_sim_action[self.cube_size][action]
-                next_sim_cube = doMove(self.sim_cube, sim_action)
-                next_state = self.sim_state_to_state(next_sim_cube)
-                if isSolved(next_sim_cube):
-                    reward = 1.0
-                    target_value, target_policy = 1.0, action
-                    break
+        action_list = [[0,0],[0,2],[0,3],[0,4],[0,5],\
+                        [1,1],[1,2],[1,3],[1,4],[1,5],\
+                        [2,0],[2,1],[2,2],[2,4],[2,5],\
+                        [3,0],[3,1],[3,3],[3,4],[3,5],\
+                        [4,0],[4,1],[4,2],[4,3],[4,4],\
+                        [5,0],[5,1],[5,2],[5,3],[5,4]]
+        for idx, action_pair in enumerate(action_list):
+            sim_cube = copy.deepcopy(self.sim_cube)
+            for action in action_pair:
+                if self.cube_size == 2:
+                    sim_action = self.action_to_sim_action[self.cube_size][action]
+                    next_sim_cube = doMove(sim_cube, sim_action)
+                    next_state = self.sim_state_to_state(next_sim_cube)
+                    if isSolved(next_sim_cube):
+                        reward = 1.0
+                        target_value, target_policy = 1.0, action_pair[0]
+                        break
+                    else:
+                        reward = -1.0
+                    sim_cube = next_sim_cube                    
+                elif self.cube_size == 3:
+                    raise NotImplementedError
                 else:
-                    reward = -1.0
-                next_state_list.append(next_state)
-                reward_list.append(reward)
-            elif self.cube_size == 3:
-                raise NotImplementedError
-            else:
-                raise NotImplementedError
+                    raise NotImplementedError
+            if reward == 1.0:
+                break
+            next_state_list.append(next_state)
+            reward_list.append(-1*len(action_pair))
         if reward != 1.0:
             next_state_tensor = torch.tensor(np.array(next_state_list), device=self.device).float() # action_dim, state_dim[0], state_dim[1]
             reward_tensor = torch.tensor(reward_list, device = self.device) # action_dim
+            # print(next_state_tensor.shape, reward_tensor.shape)
             with torch.no_grad():
                 next_value, _ = model(next_state_tensor)
                 value = next_value.squeeze(dim=-1).detach() + reward_tensor
             target_value, target_policy = torch.max(value, -1, keepdim=True)
-            target_value, target_policy = target_value.item(), target_policy.item()
+            target_value, target_policy = target_value.item(), action_list[target_policy.item()][0]
         # weight = scramble_count ** (-1*temperature)
         with torch.no_grad():
             state_tensor = torch.tensor(self.cube, device=self.device).float()

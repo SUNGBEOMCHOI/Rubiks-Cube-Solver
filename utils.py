@@ -228,15 +228,12 @@ def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, d
     train_dataloader = DataLoader(replay_buffer, batch_size=batch_size, shuffle=True)
     num_samples = len(replay_buffer)
     total_loss = 0.0
-    num_count = defaultdict(int)
     for state, target_value, target_policy, scramble_count, memory_idxs in train_dataloader:
         state = state.to(device)
         target_value = target_value.to(device)
         target_policy = target_policy.to(device)
         scramble_count = scramble_count.to(device)
 
-        for count in scramble_count:
-            num_count[count.item()] += 1
         reciprocal_scramble_count = torch.pow(torch.reciprocal(scramble_count), temperature)
         
         predicted_value, predicted_policy = model(state.float().detach())
@@ -258,9 +255,4 @@ def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, d
 
         total_loss = total_loss + loss.item()
     total_loss/= num_samples
-    f = open('count.txt', 'a')
-    for count in range(1, 31):
-        f.write(f'{num_count[count]} ')
-    f.write(f'\n')
-    f.close()
     return total_loss
