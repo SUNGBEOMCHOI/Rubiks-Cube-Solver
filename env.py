@@ -250,10 +250,10 @@ class Cube(gym.Env):
             target_value, target_policy = torch.max(value, -1, keepdim=True)
             target_value, target_policy = target_value.item(), target_policy.item()
         # weight = scramble_count ** (-1*temperature)
-        # with torch.no_grad():
-        #     state_tensor = torch.tensor(self.cube, device=self.device).float()
-        #     value, _ = model(state_tensor)
-        #     error = abs(value.detach().item() - target_value)
+        with torch.no_grad():
+            state_tensor = torch.tensor(self.cube, device=self.device).float()
+            value, _ = model(state_tensor)
+            error = abs(value.detach().item() - target_value)
         error = 0.0
         return target_value, target_policy, error
 

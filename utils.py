@@ -241,8 +241,8 @@ def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, d
         # calculate value loss
         loss = value_criterion(predicted_value, target_value.detach()).squeeze(dim=-1)
                         
-        # for loss_idx, memory_idx in enumerate(memory_idxs):
-        #     replay_buffer.update(memory_idx, loss[loss_idx].item())
+        for loss_idx, memory_idx in enumerate(memory_idxs):
+            replay_buffer.update(memory_idx, loss[loss_idx].item())
         value_loss = (loss*reciprocal_scramble_count.squeeze(dim=-1).detach()).mean()
 
         # calculate policy loss
