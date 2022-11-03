@@ -52,12 +52,10 @@ class MCTS():
         for i in range(self.numMCTSSim):
             self.search(state, depth)
             self.env = copy.deepcopy(self.initial_env)
-            print(self.Nsa.values())
 
         s = np.array2string(state)
         counts = [self.Nsa[(depth, s, a)] if (depth, s, a) in self.Nsa else 0 for a in range(self.action_dim)] #(6,) list  number of times that (s,a) was visited
 
-        
         if temp == 0:
             #greedy
             bestAs = np.array(np.argwhere(counts == np.max(counts))).flatten()
@@ -65,6 +63,12 @@ class MCTS():
             probs = [0] * len(counts)
             probs[bestA] = 1
             return probs
+        # elif temp == -1:
+        #     a = [self.Qsa[(depth, s, a)] if (depth, s, a) in self.Qsa else 0 for a in range(self.action_dim)]
+        #     bestA = a.index(max(a))
+        #     probs = [0]*6
+        #     probs[bestA] = 1
+        #     return probs
 
 
         counts = [x ** (1. / temp) for x in counts]
@@ -123,7 +127,7 @@ class MCTS():
                 self.Ps[(depth, s)] /= sum_Ps_s
 
             self.Ns[(depth, s)] = 0
-            return -v
+            return v
 
 
         cur_best = -float('inf')
@@ -136,7 +140,7 @@ class MCTS():
                     u = self.Qsa[(depth, s, a)] + self.cpuct * self.Ps[(depth, s)][a] * math.sqrt(self.Ns[(depth, s)]) / (
                             1 + self.Nsa[(depth, s, a)])
                 else:
-                    u = self.cpuct * self.Ps[(depth, s)][a] * math.sqrt(self.Ns[(depth, s)] + EPS)  # Q = 0 ?
+                    u = self.cpuct * self.Ps[(depth, s)][a] * math.sqrt(self.Ns[(depth, s)])  # Q = 0 ?
 
                 if u > cur_best:
                     cur_best = u
@@ -151,7 +155,7 @@ class MCTS():
         
 
         if (depth, s, a) in self.Qsa:
-            self.Qsa[(depth, s, a)] = (self.Nsa[(depth, s, a)] * self.Qsa[(depth, s, a)] + v) / (self.Nsa[(depth, s, a)] + 1)
+            self.Qsa[(depth, s, a)] = max(self.Qsa[(depth, s, a)], v)
             self.Nsa[(depth, s, a)] += 1
 
         else:
@@ -159,7 +163,7 @@ class MCTS():
             self.Nsa[(depth, s, a)] = 1
 
         self.Ns[(depth, s)] += 1
-        return -v
+        return v
 
 
     def visualization(self):
