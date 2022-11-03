@@ -65,5 +65,6 @@ class DeepCube(nn.Module):
         """
         x = torch.tensor(x).float().detach()
         value, policy = self.forward(x)
+        policy = nn.functional.softmax(policy)
 
         return value.numpy()[0], policy.numpy()[0]
