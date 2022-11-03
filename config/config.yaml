@@ -1,8 +1,8 @@
 train:
   batch_size: 256
-  sample_size: 10000
+  sample_size: 1000
   learning_rate: 0.001
-  epochs: 10000
+  epochs: 1000
   sample_epoch: 1
   sample_scramble_count: 30
   sample_cube_count: 100
@@ -13,7 +13,7 @@ train:
   model_path: ./pretrained
   progress_path: ./train_progress
 validation:
-  max_timesteps: 200
+  max_timesteps: 100
   sample_scramble_count: 30
   sample_cube_count: 10
 env:
@@ -23,7 +23,7 @@ model:
     - 256
     - 64
     - 32
-device: cuda
+device: cpu
 mcts:
   numMCTSSim: 10
   cpuct: 1.0

@@ -127,7 +127,7 @@ def save_model(model, epoch, optimizer, lr_scheduler, model_path='./pretrained')
         }, f'{model_path}/model_{epoch}.pt')
 
 class ReplayBuffer(Dataset):
-    def __init__(self, buf_size, sample_size):
+    def __init__(self, buf_size, sample_size, per=True):
         """
         Make replay buffer of deque structure which stores data samples
         
@@ -137,10 +137,9 @@ class ReplayBuffer(Dataset):
         self.buf_size = buf_size
         self.sample_size = sample_size
         self.memory = deque(maxlen=self.buf_size)
-        # self.prob_memory = deque(maxlen=self.buf_size) # Deque of saving sampling probability
         self.error_memory = deque(maxlen=self.buf_size) # Deque of saving error
         # error means difference between target value and predicted value
-        # self.sum_error = 0.0 # sum of total error
+        self.per = per
         self.prioritized_idx = None
 
     def __len__(self):
@@ -149,7 +148,10 @@ class ReplayBuffer(Dataset):
         Returns:
             Length of prioritized memory
         """
-        return len(self.prioritized_idx)
+        if self.per:
+            return len(self.prioritized_idx)
+        else:
+            return self.sample_size
 
     def __getitem__(self, idx):
         """
@@ -162,7 +164,10 @@ class ReplayBuffer(Dataset):
             target_policy_tensor: Torch tensor of target value of shape [action_dim]
             scramble_count_tensor: Torch tensor of scamble count of shape [1]
         """
-        memory_idx = self.prioritized_idx[idx]
+        if self.per:
+            memory_idx = self.prioritized_idx[idx]
+        else:
+            memory_idx = idx
         state_tensor = torch.tensor(self.memory[memory_idx].state)
         target_value_tensor = torch.tensor(self.memory[memory_idx].target_value)
         target_policy_tensor = torch.tensor(self.memory[memory_idx].target_policy)
@@ -171,12 +176,15 @@ class ReplayBuffer(Dataset):
         return state_tensor, target_value_tensor, target_policy_tensor, scramble_count_tensor, idx_tensor
         
     def get_prioritized_sample(self):
-        if len(self.memory) <= self.sample_size:
-            self.prioritized_idx = np.arange(len(self.memory))
+        if self.per:
+            if len(self.memory) <= self.sample_size:
+                self.prioritized_idx = np.arange(len(self.memory))
+            else:
+                np_error_memory = np.array(self.error_memory)
+                self.prob_memory = np_error_memory / sum(np_error_memory)
+                self.prioritized_idx = np.random.choice(np.arange(len(self.memory)), self.sample_size, replace=False, p=self.prob_memory)
         else:
-            np_error_memory = np.array(self.error_memory)
-            self.prob_memory = np_error_memory / sum(np_error_memory)
-            self.prioritized_idx = np.random.choice(np.arange(len(self.memory)), self.sample_size, replace=False, p=self.prob_memory)
+            pass
 
     def append(self, x):
         """
@@ -233,8 +241,8 @@ def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, d
         # calculate value loss
         loss = value_criterion(predicted_value, target_value.detach()).squeeze(dim=-1)
                         
-        for loss_idx, memory_idx in enumerate(memory_idxs):
-            replay_buffer.update(memory_idx, loss[loss_idx].item())
+        # for loss_idx, memory_idx in enumerate(memory_idxs):
+        #     replay_buffer.update(memory_idx, loss[loss_idx].item())
         value_loss = (loss*reciprocal_scramble_count.squeeze(dim=-1).detach()).mean()
 
         # calculate policy loss

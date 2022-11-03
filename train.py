@@ -48,7 +48,7 @@ def train(cfg, args):
     optimizer = optim_func(deepcube, learning_rate)
     lr_scheduler = scheduler_func(optimizer)
 
-    replay_buffer = ReplayBuffer(buffer_size, sample_size)
+    replay_buffer = ReplayBuffer(buffer_size, sample_size, per=False)
     loss_history = defaultdict(lambda: {'loss':[]})
     valid_history = defaultdict(lambda: {'solve_percentage':[]})
 
