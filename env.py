@@ -239,7 +239,10 @@ class Cube(gym.Env):
                     next_state = self.sim_state_to_state(next_sim_cube)
                     if isSolved(next_sim_cube):
                         reward = 1.0
-                        target_value, target_policy = 1.0, action_pair[0]
+                        if action == action_pair[0]:
+                            target_value, target_policy = 1.0, action_pair[0]
+                        else:
+                            target_value, target_policy = 0.0, action_pair[0]
                         break
                     else:
                         reward = -1.0
