@@ -17,7 +17,7 @@ class MCTS():
     def __init__(self, model, cfg):
 
         """
-        game : cube class
+        env : cube class
         model : trained neural network
         cfg : configuration(numMCTSSims, cpuct)
         """
@@ -32,31 +32,30 @@ class MCTS():
         self.Ns = {}  # stores #times board s was visited
         self.Ps = {}  # stores initial policy (returned by neural net)
 
-        self.Es = {}  # stores game.getGameEnded ended for board s
+        self.Es = {}  # stores env.getenvEnded ended for board s
 
-    def getActionProb(self, canonicalBoard, game, temp=0):
+    def getActionProb(self, state, env, depth, temp=0):
         """
         This function performs numMCTSSims simulations of MCTS starting from
-        canonicalBoard.
+        state.
         Args:
-            canonicalBoard : numpy array which represent state  (7,21)
+            state : numpy array which represent state  (7,21)
 
         Returns:
             probs: a policy vector where the probability of the ith action is
                    proportional to Nsa[(s,a)]**(1./temp)   , list type
         """
-        self.initial_game = game
-        self.game = copy.deepcopy(game)
+        self.initial_env = env
+        self.env = copy.deepcopy(env)
 
         # numMCTSSims : number of MCTS simulations
         for i in range(self.numMCTSSim):
-            self.search(canonicalBoard)
+            self.search(state, depth)
+            self.env = copy.deepcopy(self.initial_env)
+            print(self.Nsa.values())
 
-            self.game = copy.deepcopy(self.initial_game)
-
-
-        s = np.array2string(canonicalBoard)
-        counts = [self.Nsa[(0, s, a)] if (0, s, a) in self.Nsa else 0 for a in range(self.action_dim)] #(6,) list  number of times that (s,a) was visited
+        s = np.array2string(state)
+        counts = [self.Nsa[(depth, s, a)] if (depth, s, a) in self.Nsa else 0 for a in range(self.action_dim)] #(6,) list  number of times that (s,a) was visited
 
         
         if temp == 0:
@@ -73,7 +72,7 @@ class MCTS():
         probs = [x / counts_sum for x in counts]
         return probs
 
-    def search(self, canonicalBoard, depth=0, game_ended = False):
+    def search(self, state, depth=0, previous_action = -1, env_ended = False):
         """
         This function performs one iteration of MCTS. It is recursively called
         till a leaf node is found. The action chosen at each node is one that
@@ -90,17 +89,23 @@ class MCTS():
         state for the current player, then its value is -v for the other player.
 
         Args:
-            canonicalBoard : numpy array which represent state  (7,21)
-            game_ended : Boolean type
+            state : numpy array which represent state  (7,21)
+            depth : depth of node
+            previous_action : integer(0-action_dim) which represent previous action
+            env_ended : Boolean type
 
         Returns:
-            v: the negative of the value of the current canonicalBoard (if canonicalBoard is terminal, return 1)
+            v: the negative of the value of the current state (if state is terminal, return 1)
         """
 
-        s = np.array2string(canonicalBoard)
+        s = np.array2string(state)
+        if previous_action == -1:
+            invalid_action = -1
+        else:
+            invalid_action = previous_action + 1 - 2*(previous_action%2)
 
         if (depth, s) not in self.Es:
-            self.Es[(depth, s)] = game_ended
+            self.Es[(depth, s)] = env_ended
     
 
         if self.Es[(depth, s)]:
@@ -110,31 +115,40 @@ class MCTS():
 
         if (depth, s) not in self.Ps:
             # leaf node is found
-            v, self.Ps[(depth, s)] = self.model.predict(canonicalBoard)
+
+            v, self.Ps[(depth, s)] = self.model.predict(state)
+            if invalid_action != -1:
+                self.Ps[(depth, s)][invalid_action] = 0
+                sum_Ps_s = np.sum(self.Ps[(depth,s)])
+                self.Ps[(depth, s)] /= sum_Ps_s
 
             self.Ns[(depth, s)] = 0
             return -v
+
 
         cur_best = -float('inf')
         best_act = -1
 
         # pick the action with the highest upper confidence bound
         for a in range(self.action_dim):
-            if (depth, s, a) in self.Qsa:
-                u = self.Qsa[(depth, s, a)] + self.cpuct * self.Ps[(depth, s)][a] * math.sqrt(self.Ns[(depth, s)]) / (
-                        1 + self.Nsa[(depth, s, a)])
-            else:
-                u = self.cpuct * self.Ps[(depth, s)][a] * math.sqrt(self.Ns[(depth, s)] + EPS)  # Q = 0 ?
+            if a != invalid_action:
+                if (depth, s, a) in self.Qsa:
+                    u = self.Qsa[(depth, s, a)] + self.cpuct * self.Ps[(depth, s)][a] * math.sqrt(self.Ns[(depth, s)]) / (
+                            1 + self.Nsa[(depth, s, a)])
+                else:
+                    u = self.cpuct * self.Ps[(depth, s)][a] * math.sqrt(self.Ns[(depth, s)] + EPS)  # Q = 0 ?
 
-            if u > cur_best:
-                cur_best = u
-                best_act = a
+                if u > cur_best:
+                    cur_best = u
+                    best_act = a
 
         a = best_act
-        next_s, _, done, _ = self.game.step(a)
+        next_s, _, done, _ = self.env.step(a)
 
 
-        v = self.search(next_s, depth+1, game_ended=done)
+        v = self.search(next_s, depth+1, a, env_ended=done)
+
+        
 
         if (depth, s, a) in self.Qsa:
             self.Qsa[(depth, s, a)] = (self.Nsa[(depth, s, a)] * self.Qsa[(depth, s, a)] + v) / (self.Nsa[(depth, s, a)] + 1)
@@ -146,3 +160,22 @@ class MCTS():
 
         self.Ns[(depth, s)] += 1
         return -v
+
+
+    def visualization(self):
+        encoded_state = {}
+        depth_list = []
+        for k in range(70):
+            depth_list.append([])
+        
+
+        for idx, key in enumerate(self.Ps.keys()):
+            if key[1] not in encoded_state:
+                encoded_state[key[1]] = idx
+            
+        
+        for key in self.Ps.keys():
+            depth_list[key[0]].append(encoded_state[key[1]])
+        
+        print(depth_list)
+
