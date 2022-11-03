@@ -27,3 +27,9 @@ device: cuda
 mcts:
   numMCTSSim: 10
   cpuct: 1.0
+test:
+  cube_size: 2
+  test_model_path: './test/model'
+  save_file_path: './test'
+  max_timesteps: 60
+  show_scramble_count: 100
