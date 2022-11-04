@@ -31,6 +31,6 @@ test:
   cube_size: 2
   test_model_path: './test/model'
   save_file_path: './test'
-  max_timesteps: 60
+  max_timesteps: 200
   show_scramble_count: 100
-  masks: 'only' # or 'both'
+  masks: 'both' #'only' # or 'both'
