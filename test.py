@@ -37,8 +37,8 @@ def test(cfg, mode = 'show'):
 
     if mode == 'save':
         time1 = time.time()
-        plot_test_solve_percentage(deepcube, env, cfg, device)
-        # plot_test_distribution_and_dispersion(deepcube, env, cfg, device)
+        # plot_test_solve_percentage(deepcube, env, cfg, device)
+        plot_test_distribution_and_dispersion(deepcube, env, cfg, device)
         print(time.time()-time1)
         pass
     elif mode == 'show': # 화면에 띄우기
@@ -47,8 +47,7 @@ def test(cfg, mode = 'show'):
         # trial 결과 나왔으니 시뮬레이션 띄우기 
         pass
     else : # show랑 save 둘다 아님
-        print('You can only choose \"show\" or \"save\" as mode factor')
-        raise ValueError
+        raise ValueError('You can only choose \"show\" or \"save\" as mode factor')
 
 def trial(model, env, cfg, scramble_count, seed = None, mask=True, save = True):
     """
@@ -103,6 +102,7 @@ def plot_test_solve_percentage(model, env, cfg, device):
         env: Cube environment
         cfg: Which contains trial configuration
         device:
+        masks: 'only' or 'both'
     """
 
     test_model_path = cfg['test']['test_model_path']
@@ -110,6 +110,13 @@ def plot_test_solve_percentage(model, env, cfg, device):
     trial_scramble_count = 30
     trial_cube_count = 50
     model_list = os.listdir(test_model_path)
+    masks = cfg['test']['masks']
+    if masks == 'only' :
+        masks = [True]
+    elif masks == 'both':
+        masks = [True, False]
+    else:
+        masks = [False]
 
     fig, ax = plt.subplots(figsize = (6,6), facecolor = '#c1f1f1')
     ax.set_title('Difficulty vs Solve Percentage')
@@ -123,7 +130,7 @@ def plot_test_solve_percentage(model, env, cfg, device):
         solve_time_table = np.zeros((trial_scramble_count, trial_cube_count))
         trial_result_table = np.zeros((trial_scramble_count, trial_cube_count))
             
-        for mask in [True, False]:
+        for mask in masks:
             for scramble_count in range(1, trial_scramble_count+1):
                 for cube_count in range(trial_cube_count):
                     solve_count, solve_time, trial_result = trial(model, env, cfg, scramble_count, seed=cube_count, mask=mask)
@@ -150,6 +157,7 @@ def plot_test_distribution_and_dispersion(model, env, cfg, device):
         env: Cube environment
         cfg: Which contains trial configuration
         device:
+        masks: 'only' or 'both'
     """
 
     test_model_path = cfg['test']['test_model_path']
@@ -157,8 +165,16 @@ def plot_test_distribution_and_dispersion(model, env, cfg, device):
     trial_scramble_count = 1000
     trial_cube_count = 640
     model_list = os.listdir(test_model_path)
+    masks = cfg['test']['masks']
+    if masks == 'only' :
+        masks = [True]
+    elif masks == 'both':
+        masks = [True, False]
+    else:
+        masks = [False]
 
     fig, axes = plt.subplots(2,1, figsize = (6,12), facecolor = '#c1f1f1')
+    ax2 = axes[1].twinx()
     axes[0].set_title('Distribution of Solve Time')
     axes[0].set_xlabel('Seconds')
     axes[0].set_ylabel('Number of cubes')
@@ -174,7 +190,7 @@ def plot_test_distribution_and_dispersion(model, env, cfg, device):
         solve_time_table = np.zeros(trial_cube_count)
         trial_result_table = np.zeros(trial_cube_count)
         
-        for idx2, mask in enumerate([True, False]):
+        for idx2, mask in enumerate(masks):
             for cube_count in range(trial_cube_count):
                 seed = cube_count
                 solve_count, solve_time, trial_result = trial(model, env, cfg, trial_scramble_count, seed, mask=mask)
@@ -186,10 +202,16 @@ def plot_test_distribution_and_dispersion(model, env, cfg, device):
             solve_time_list_s = solve_time_table[~np.isnan(solve_count_table)]
             axes[0].hist(solve_time_list_s, range=(0, 0.04), bins=40, alpha = 0.9, label = f'{"Mask"*mask} {model_name[:-3]}', histtype='step')
             axes[1].boxplot(solve_count_table[~np.isnan(solve_count_table)], positions=range(idx1*2+idx2+1, idx1*2+idx2+2))
+            ax2.axhline(trial_result_table.mean()*100, xmin=(idx1*2+idx2+1+0.5-0.5)/((len(masks)+1) * len(model_list)+1),
+                                          xmax=(idx1*2+idx2+1+0.5+0.5)/((len(masks)+1) * len(model_list)+1), color = 'red', linestyle='--')
             xlabel_list.append(f'{"Mask"*mask} {model_name[:-3]}')
     
         axes[0].legend(loc = 'upper right')
-        axes[1].set_xticklabels(xlabel_list)
+        if len(xlabel_list) < 5:  
+            axes[1].set_xticklabels(xlabel_list)
+        else:
+            axes[1].set_xticklabels(range(1, len(xlabel_list)+1))
+        ax2.set_yticks(range(0, 101, 10))
 
     plt.savefig(f'{save_file_path}/Dispersion of scramble count.png', dpi = 300)
     # plt.show()
