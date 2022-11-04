@@ -42,21 +42,35 @@ class DeepCube(nn.Module):
         action_output = self.policy_net(x)
         return value, action_output
 
-    def get_action(self, x):
+    def get_action(self, x, pre_action=None):
         """
         Return action corresponding input states
         Args:
             x: input state of size [state_dim[0], state_dim[1]]
+            pre_action(int): last action to avoid its counter action (만약 pre_action이 None이면 기존과 동일, 안 넣어도 됨)
         Returns:
             action: Integer of action
         """
         if x.dim() == 2: # batch size가 없으면
             x = x.unsqueeze(dim=0)
         _, action_output = self.forward(x)
+
         # action_probs = torch.nn.functional.softmax(action_output)
         # m = Categorical(action_probs)
         # action = m.sample().item()
-        action = torch.argmax(action_output).item()
+        
+        if pre_action == None :
+            invalid_action = None
+        elif pre_action % 2 == 1: # pre_action이 0이면 1 // pre_action이 1이면 0
+            invalid_action = pre_action-1
+        else:
+            invalid_action = pre_action+1
+
+        if invalid_action == action_output.sort(descending=True)[1][0][0]:
+            action = action_output.sort(descending=True)[1][0][1].item() # 최선의 action이 counter일 때 차선의 action
+        else:
+            action = action_output.sort(descending=True)[1][0][0].item() # 최선의 action
+ 
         return action
 
     def predict(self, x):
@@ -71,4 +85,5 @@ class DeepCube(nn.Module):
         x = torch.tensor(x).float().detach()
         value, policy = self.forward(x)
         policy = nn.functional.softmax(policy, dim=-1)
+
         return value.numpy()[0], policy.numpy()[0]

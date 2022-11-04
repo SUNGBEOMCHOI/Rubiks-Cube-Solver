@@ -1,4 +1,4 @@
-from collections import deque
+from collections import deque, Counter
 
 import numpy as np
 import torch
@@ -34,7 +34,7 @@ def scheduler_func(optimizer):
     Returns:
         scheduler: learning rate scheduler
     """
-    scheduler = optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.001, max_lr=0.01, step_size_up=20, step_size_down=40, mode='triangular', cycle_momentum=False)
+    scheduler = optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.0001, max_lr=0.005, step_size_up=20, step_size_down=40, mode='triangular', cycle_momentum=False)
     return scheduler
 
 def plot_progress(loss_history, save_file_path='./train_progress'):
@@ -60,16 +60,17 @@ def plot_progress(loss_history, save_file_path='./train_progress'):
     # plt.show()
     plt.close()
 
-def plot_valid_hist(valid_history, save_file_path='./train_progress'):
+def plot_valid_hist(valid_history, save_file_path='./train_progress', validation_epoch=10):
     """
     plot validation results, x-axis: scramble distance, y-axis: percentage solved
     
     Args:
         valid_history: Dictionary which contains solved percentage for each scramble distance
         save_file_path: Path for saving progress graph
+        validation_epoch
     """
-    max_scramble_count = len(valid_history[1]['solve_percentage'])
-    plot_epoch_list = np.unique(np.linspace(1, len(valid_history), num=5, dtype=int))
+    max_scramble_count = len(valid_history[validation_epoch]['solve_percentage'])
+    plot_epoch_list = np.unique(np.linspace(1, len(valid_history)+0.001, num=5, dtype=int))*validation_epoch
     scramble_count_list = np.arange(1, max_scramble_count+1)
     for epoch in plot_epoch_list:
         solve_percentage_list = np.array(valid_history[epoch]['solve_percentage'])
@@ -126,22 +127,29 @@ def save_model(model, epoch, optimizer, lr_scheduler, model_path='./pretrained')
         }, f'{model_path}/model_{epoch}.pt')
 
 class ReplayBuffer(Dataset):
-    def __init__(self, buf_size):
+    def __init__(self, buf_size, sample_size):
         """
         Make replay buffer of deque structure which stores data samples
         
         Args:
             buf_size: deque max size
         """
-        self.memory = deque(maxlen=buf_size)
+        self.buf_size = buf_size
+        self.sample_size = sample_size
+        self.memory = deque(maxlen=self.buf_size)
+        # self.prob_memory = deque(maxlen=self.buf_size) # Deque of saving sampling probability
+        self.error_memory = deque(maxlen=self.buf_size) # Deque of saving error
+        # error means difference between target value and predicted value
+        # self.sum_error = 0.0 # sum of total error
+        self.prioritized_idx = None
 
     def __len__(self):
         """
-        Return length of replay memory
+        Return length of prioritized memory
         Returns:
-            Length of replay memory        
+            Length of prioritized memory
         """
-        return len(self.memory)
+        return len(self.prioritized_idx)
 
     def __getitem__(self, idx):
         """
@@ -154,23 +162,43 @@ class ReplayBuffer(Dataset):
             target_policy_tensor: Torch tensor of target value of shape [action_dim]
             scramble_count_tensor: Torch tensor of scamble count of shape [1]
         """
-        # TODO shape 확인해봐야함
-        state_tensor = torch.tensor(self.memory[idx].state)
-        target_value_tensor = torch.tensor(self.memory[idx].target_value)
-        target_policy_tensor = torch.tensor(self.memory[idx].target_policy)
-        scramble_count_tensor = torch.tensor(self.memory[idx].scramble_count)
-        return state_tensor, target_value_tensor, target_policy_tensor, scramble_count_tensor
+        memory_idx = self.prioritized_idx[idx]
+        state_tensor = torch.tensor(self.memory[memory_idx].state)
+        target_value_tensor = torch.tensor(self.memory[memory_idx].target_value)
+        target_policy_tensor = torch.tensor(self.memory[memory_idx].target_policy)
+        scramble_count_tensor = torch.tensor(self.memory[memory_idx].scramble_count)
+        idx_tensor = torch.tensor(memory_idx)
+        return state_tensor, target_value_tensor, target_policy_tensor, scramble_count_tensor, idx_tensor
         
+    def get_prioritized_sample(self):
+        if len(self.memory) <= self.sample_size:
+            self.prioritized_idx = np.arange(len(self.memory))
+        else:
+            np_error_memory = np.array(self.error_memory)
+            self.prob_memory = np_error_memory / sum(np_error_memory)
+            self.prioritized_idx = np.random.choice(np.arange(len(self.memory)), self.sample_size, replace=False, p=self.prob_memory)
 
     def append(self, x):
         """
-        Append x into replay memory
+        Append x into replay memory and save error list
         Args:
             x: Input
         """
         self.memory.append(x)
+        self.error_memory.append(x.error)
+
+    def update(self, idx, error):
+        """
+        Update error of replay buffer
+
+        Args:
+            idx: Index of replay memory you want to change
+            error: New error
+        """
+        self.error_memory[idx] = error
+
         
-def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, device):
+def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, device, temperature=0.3):
     """
     Update model networks' parameters with replay buffer
     
@@ -181,27 +209,33 @@ def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, d
         optimizer
         batch_size
         device
+        temperature: Constant of scramble count weight
+                     0 -> all scramble count has same weight, Large temperature has large difference weight
     Returns:
         total_loss: sum of value loss and policy loss
     """
     value_criterion, policy_criterion = criterion_list
 
+    replay_buffer.get_prioritized_sample()
     train_dataloader = DataLoader(replay_buffer, batch_size=batch_size, shuffle=True)
     num_samples = len(replay_buffer)
     total_loss = 0.0
-    for state, target_value, target_policy, scramble_count in train_dataloader:
+    for state, target_value, target_policy, scramble_count, memory_idxs in train_dataloader:
         state = state.to(device)
         target_value = target_value.to(device)
         target_policy = target_policy.to(device)
         scramble_count = scramble_count.to(device)
-        reciprocal_scramble_count = torch.reciprocal(scramble_count)
-
+        reciprocal_scramble_count = torch.pow(torch.reciprocal(scramble_count), temperature)
+        
         predicted_value, predicted_policy = model(state.float().detach())
         predicted_value, predicted_policy = predicted_value.squeeze(dim=-1), predicted_policy.squeeze(dim=-1)
         optimizer.zero_grad()
         # calculate value loss
-        value_loss = (value_criterion(predicted_value, target_value.detach()).squeeze(dim=-1) * \
-                        reciprocal_scramble_count.squeeze(dim=-1).detach()).mean()
+        loss = value_criterion(predicted_value, target_value.detach()).squeeze(dim=-1)
+                        
+        for loss_idx, memory_idx in enumerate(memory_idxs):
+            replay_buffer.update(memory_idx, loss[loss_idx].item())
+        value_loss = (loss*reciprocal_scramble_count.squeeze(dim=-1).detach()).mean()
 
         # calculate policy loss
         policy_loss = (policy_criterion(predicted_policy, target_policy.detach()) * \
