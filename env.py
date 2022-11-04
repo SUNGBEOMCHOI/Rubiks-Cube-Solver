@@ -33,7 +33,7 @@ class Cube(gym.Env):
             cube_size: Cube size you want to make environment
         """
         super().__init__()
-        self.transaction = namedtuple('Sample', ['state', 'target_value', 'target_policy', 'scramble_count', 'error'])
+        # self.transaction = namedtuple('Sample', ['state', 'target_value', 'target_policy', 'scramble_count', 'error'])
         self.cube_size = cube_size
         self.device = device
         self.action_to_sim_action = {\
@@ -160,7 +160,8 @@ class Cube(gym.Env):
             for scramble_idx, action in enumerate(action_sequence):
                 state, _, _, _ = self.step(action)
                 target_value, target_policy, error = self.get_target_value(model, scramble_idx+1, temperature)
-                sample = self.transaction(state, target_value, target_policy, scramble_idx+1, error)
+                # sample = self.transaction(state, target_value, target_policy, scramble_idx+1, error)
+                sample = {'state':state, 'target_value':target_value, 'target_policy':target_policy, 'scramble_count':scramble_idx+1, 'error':error}
                 replay_buffer.append(sample)
         
                 
