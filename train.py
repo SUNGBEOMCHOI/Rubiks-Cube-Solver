@@ -7,6 +7,7 @@ from tqdm import tqdm
 import numpy as np
 import torch
 
+from mcts import MCTS
 from model import DeepCube
 from env import make_env
 from utils import ReplayBuffer, get_env_config, loss_func, optim_func, scheduler_func,\
@@ -78,6 +79,7 @@ def train(cfg, args):
             plot_progress(loss_history, save_file_path=progress_path)
         lr_scheduler.step()
 
+
 def validation(model, env, valid_history, epoch, device, cfg):
     """
     Validate model, Solve scrambled cubes with trained model and save video
@@ -94,24 +96,32 @@ def validation(model, env, valid_history, epoch, device, cfg):
     seed = [i*10 for i in range(sample_cube_count)]
     # TODO: 비디오 저장이 가능하도록
     for scramble_count in range(1, sample_scramble_count+1):
+        print('scramble_count: ', scramble_count)
         solve_count = 0
         for idx in range(1, sample_cube_count+1):
             if idx == sample_cube_count and scramble_count==sample_scramble_count: # 마지막 state
                 # env.render()
                 pass
             state, done = env.reset(seed[idx-1], scramble_count), False
-            for timestep in range(1, max_timesteps+1):
+            mcts = MCTS(model, cfg)
+            solve_time = 1
+            action_list = []
+
+            for timestep in range(0, max_timesteps+1):
                 with torch.no_grad():
-                    state_tensor = torch.tensor(state).float().to(device).detach()
-                    action = model.get_action(state_tensor)
-                next_state, reward, done, info = env.step(action)
+                    action = mcts.getActionProb(state, env, timestep, temp=0)
+                action_list.append(action.index(1))
+                next_state, reward, done, info = env.step(action.index(max(action)))
                 if done:
                     solve_count += 1
                     break
                 state = next_state
+                solve_time += 1
             if idx == sample_cube_count and scramble_count==sample_scramble_count: # 마지막 state render종료
                 # env.close_render()
                 pass
+            print(solve_time)
+            print('-------------------')
         solve_percentage = (solve_count/sample_cube_count) * 100
         valid_history[epoch]['solve_percentage'].append(solve_percentage)
 
