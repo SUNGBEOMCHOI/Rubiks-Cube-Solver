@@ -9,10 +9,9 @@ train:
   buffer_size: 50000
   temperature: 0.3
   validation_epoch: 100
-  num_processes: 8
   video_path: ./video
-  model_path: ./pretrained/temperature_03
-  progress_path: ./train_progress/temperature_03
+  model_path: ./pretrained/quarter_model
+  progress_path: ./train_progress/quarter_model
 validation:
   max_timesteps: 100
   sample_scramble_count: 30
@@ -21,17 +20,10 @@ env:
   cube_size: 2
 model:
   hidden_dim:
-    - 256
     - 64
-    - 32
+    - 16
+    - 8
 device: cpu
 mcts:
   numMCTSSim: 10
   cpuct: 1.0
-test:
-  cube_size: 2
-  test_model_path: './test/model'
-  save_file_path: './test'
-  max_timesteps: 60
-  show_scramble_count: 100
-  masks: 'only' # or 'both'

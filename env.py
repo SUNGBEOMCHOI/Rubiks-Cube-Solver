@@ -10,7 +10,7 @@ from utils import *
 from model import DeepCube
 
 
-def make_env(device, cube_size=3):
+def make_env(device, cube_size):
     """
     Make gym environment
     Args:
@@ -25,7 +25,7 @@ def make_env(device, cube_size=3):
     return env
 
 class Cube(gym.Env):
-    def __init__(self, device, cube_size=3):
+    def __init__(self, device, cube_size):
         """
         Gym environment for cube
 
@@ -162,6 +162,30 @@ class Cube(gym.Env):
                 target_value, target_policy, error = self.get_target_value(model, scramble_idx+1, temperature)
                 sample = self.transaction(state, target_value, target_policy, scramble_idx+1, error)
                 replay_buffer.append(sample)
+
+    # def get_random_samples(self, sample_memory, shared_memory, model, sample_scramble_count, sample_cube_count, temperature):
+    #     """
+    #     Add samples to replay buffer which contain (state, target value, target policy, scramble count, error)  for training
+        
+    #     Args:
+    #         replay_buffer: Replay buffer to save samples
+    #         model: Current deep cube model
+    #         sample_scramble_count: Number of scramble cubes randomly
+    #         sample_cube_count: Number of cube samples
+
+    #     """
+    #     for sample_cube_idx in range(1, sample_cube_count+1):
+    #         self.init_state()
+    #         action_sequence = np.random.randint(self.action_dim, size=sample_scramble_count)
+    #         for scramble_idx, action in enumerate(action_sequence):
+    #             state, _, _, _ = self.step(action)
+    #             target_value, target_policy, error = self.get_target_value(model, scramble_idx+1, temperature)
+    #             sample = [state, target_value, target_policy, scramble_idx+1, error]
+    #             shared_memory.put(sample)
+    #     # print(shared_memory)
+    #             # sample = shared_memory.get()
+    #             # state, target_value, target_policy, scramble_idx, error = sample
+    #             # sample_memory.append([scramble_idx])
         
                 
 
@@ -208,15 +232,75 @@ class Cube(gym.Env):
             raise NotImplementedError
         return sim_state
 
+    # def get_target_value(self, model, scramble_count, temperature):
+    #     """
+    #     Return target value and target policy
+
+    #     Args:
+    #         state_list: List of states you want to get target valu and target policy
+    #         model: Current deep cube model
+    #         scramble_count: Scramble count of sample 
+
+    #     Returns:
+    #         target_value
+    #         target_policy
+    #         error: Difference between state value and target value
+    #     """
+    #     reward_list = []
+    #     next_state_list = []
+    #     action_list = [[0,0],[0,2],[0,3],[0,4],[0,5],\
+    #                     [1,1],[1,2],[1,3],[1,4],[1,5],\
+    #                     [2,0],[2,1],[2,2],[2,4],[2,5],\
+    #                     [3,0],[3,1],[3,3],[3,4],[3,5],\
+    #                     [4,0],[4,1],[4,2],[4,3],[4,4],\
+    #                     [5,0],[5,1],[5,2],[5,3],[5,4]]
+    #     for idx, action_pair in enumerate(action_list):
+    #         sim_cube = copy.deepcopy(self.sim_cube)
+    #         for action in action_pair:
+    #             if self.cube_size == 2:
+    #                 sim_action = self.action_to_sim_action[self.cube_size][action]
+    #                 next_sim_cube = doMove(sim_cube, sim_action)
+    #                 next_state = self.sim_state_to_state(next_sim_cube)
+    #                 if isSolved(next_sim_cube):
+    #                     reward = 1.0
+    #                     if action == action_pair[0]:
+    #                         target_value, target_policy = 1.0, action_pair[0]
+    #                     else:
+    #                         target_value, target_policy = 0.0, action_pair[0]
+    #                     break
+    #                 else:
+    #                     reward = -1.0
+    #                 sim_cube = next_sim_cube                    
+    #             elif self.cube_size == 3:
+    #                 raise NotImplementedError
+    #             else:
+    #                 raise NotImplementedError
+    #         if reward == 1.0:
+    #             break
+    #         next_state_list.append(next_state)
+    #         reward_list.append(-1*len(action_pair))
+    #     if reward != 1.0:
+    #         next_state_tensor = torch.tensor(np.array(next_state_list), device=self.device).float() # action_dim, state_dim[0], state_dim[1]
+    #         reward_tensor = torch.tensor(reward_list, device = self.device) # action_dim
+    #         # print(next_state_tensor.shape, reward_tensor.shape)
+    #         with torch.no_grad():
+    #             next_value, _ = model(next_state_tensor)
+    #             value = next_value.squeeze(dim=-1).detach() + reward_tensor
+    #         target_value, target_policy = torch.max(value, -1, keepdim=True)
+    #         target_value, target_policy = target_value.item(), action_list[target_policy.item()][0]
+    #     # weight = scramble_count ** (-1*temperature)
+    #     with torch.no_grad():
+    #         state_tensor = torch.tensor(self.cube, device=self.device).float()
+    #         value, _ = model(state_tensor)
+    #         error = abs(value.detach().item() - target_value)
+    #     return target_value, target_policy, error
     def get_target_value(self, model, scramble_count, temperature):
         """
         Return target value and target policy
-
         Args:
             state_list: List of states you want to get target valu and target policy
             model: Current deep cube model
             scramble_count: Scramble count of sample 
-
         Returns:
             target_value
             target_policy
@@ -224,47 +308,32 @@ class Cube(gym.Env):
         """
         reward_list = []
         next_state_list = []
-        action_list = [[0,0],[0,2],[0,3],[0,4],[0,5],\
-                        [1,1],[1,2],[1,3],[1,4],[1,5],\
-                        [2,0],[2,1],[2,2],[2,4],[2,5],\
-                        [3,0],[3,1],[3,3],[3,4],[3,5],\
-                        [4,0],[4,1],[4,2],[4,3],[4,4],\
-                        [5,0],[5,1],[5,2],[5,3],[5,4]]
-        for idx, action_pair in enumerate(action_list):
-            sim_cube = copy.deepcopy(self.sim_cube)
-            for action in action_pair:
-                if self.cube_size == 2:
-                    sim_action = self.action_to_sim_action[self.cube_size][action]
-                    next_sim_cube = doMove(sim_cube, sim_action)
-                    next_state = self.sim_state_to_state(next_sim_cube)
-                    if isSolved(next_sim_cube):
-                        reward = 1.0
-                        if action == action_pair[0]:
-                            target_value, target_policy = 1.0, action_pair[0]
-                        else:
-                            target_value, target_policy = 0.0, action_pair[0]
-                        break
-                    else:
-                        reward = -1.0
-                    sim_cube = next_sim_cube                    
-                elif self.cube_size == 3:
-                    raise NotImplementedError
+        for action in range(self.action_dim):
+            if self.cube_size == 2:
+                sim_action = self.action_to_sim_action[self.cube_size][action]
+                next_sim_cube = doMove(self.sim_cube, sim_action)
+                next_state = self.sim_state_to_state(next_sim_cube)
+                if isSolved(next_sim_cube):
+                    reward = 1.0
+                    target_value, target_policy = 1.0, action
+                    break
                 else:
-                    raise NotImplementedError
-            if reward == 1.0:
-                break
-            next_state_list.append(next_state)
-            reward_list.append(-1*len(action_pair))
+                    reward = -1.0
+                next_state_list.append(next_state)
+                reward_list.append(reward)
+            elif self.cube_size == 3:
+                raise NotImplementedError
+            else:
+                raise NotImplementedError
         if reward != 1.0:
             next_state_tensor = torch.tensor(np.array(next_state_list), device=self.device).float() # action_dim, state_dim[0], state_dim[1]
             reward_tensor = torch.tensor(reward_list, device = self.device) # action_dim
-            # print(next_state_tensor.shape, reward_tensor.shape)
             with torch.no_grad():
                 next_value, _ = model(next_state_tensor)
                 value = next_value.squeeze(dim=-1).detach() + reward_tensor
             target_value, target_policy = torch.max(value, -1, keepdim=True)
-            target_value, target_policy = target_value.item(), action_list[target_policy.item()][0]
-        # weight = scramble_count ** (-1*temperature)
+            target_value, target_policy = target_value.item(), target_policy.item()
+        weight = scramble_count ** (-1*temperature)
         with torch.no_grad():
             state_tensor = torch.tensor(self.cube, device=self.device).float()
             value, _ = model(state_tensor)

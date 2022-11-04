@@ -123,3 +123,9 @@ if __name__ == "__main__":
     with open('./config/config.yaml') as f:
         cfg = yaml.safe_load(f)
     train(cfg, args)
+
+    # for config_file in os.listdir('ablation_config'):
+    #     print(config_file)
+    #     with open(f'./ablation_config/{config_file}') as f:
+    #         cfg = yaml.safe_load(f)
+    #     train(cfg, args)
