@@ -109,7 +109,7 @@ def validation(model, env, valid_history, epoch, device, cfg):
 
             for timestep in range(0, max_timesteps+1):
                 with torch.no_grad():
-                    action = mcts.getActionProb(state, env, timestep, temp=0)
+                    action = mcts.getActionProb(state, env, temp=0)
                 action_list.append(action.index(1))
                 next_state, reward, done, info = env.step(action.index(max(action)))
                 if done:
@@ -121,6 +121,7 @@ def validation(model, env, valid_history, epoch, device, cfg):
                 # env.close_render()
                 pass
             print(solve_time)
+            print(action_list)
             print('-------------------')
         solve_percentage = (solve_count/sample_cube_count) * 100
         valid_history[epoch]['solve_percentage'].append(solve_percentage)
