@@ -185,6 +185,7 @@ class Agent(mp.Process):
         self.deepcube.load_state_dict(self.global_deepcube.state_dict())
         self.env = make_env(self.device, cube_size)
         self.global_epoch = global_epoch
+        self.local_epoch = 0
 
         self.optimizer = optimizer
         self.criterion_list = loss_func()
@@ -195,18 +196,21 @@ class Agent(mp.Process):
         self.loss_history = loss_history
 
     def run(self):
+        import time
+        a = time.time()
         while self.global_epoch.value <= (self.epochs+1):
             with self.global_epoch.get_lock():
                 self.global_epoch.value += 1
-            if (self.global_epoch.value-1) % self.sample_epoch == 0:
+                self.local_epoch = self.global_epoch.value
+            if (self.local_epoch-1) % self.sample_epoch == 0:
                 self.env.get_random_samples(self.replay_buffer, self.deepcube, self.sample_scramble_count, self.sample_cube_count, self.temperature)
             loss = update_params(self.deepcube, self.global_deepcube, self.replay_buffer, self.criterion_list, self.optimizer, self.batch_size, self.device, self.temperature)
-            self.loss_history[self.global_epoch.value] = {'loss':[loss]}
-            if self.global_epoch.value % self.validation_epoch == 0:
-                print(f'Current epochs: {self.global_epoch.value}')
-                validation(self.deepcube, self.env, self.valid_history, self.global_epoch.value, self.device, self.cfg)
+            self.loss_history[self.local_epoch] = {'loss':[loss]}
+            if self.local_epoch % self.validation_epoch == 0:
+                print(f'Current epochs: {self.local_epoch}, {time.time() - a}')
+                validation(self.deepcube, self.env, self.valid_history, self.local_epoch, self.device, self.cfg)
                 plot_valid_hist(self.valid_history, save_file_path=self.progress_path, validation_epoch=self.validation_epoch)
-                save_model(self.deepcube, self.global_epoch.value, self.optimizer, self.lr_scheduler, self.model_path)
+                save_model(self.deepcube, self.local_epoch, self.optimizer, self.lr_scheduler, self.model_path)
                 plot_progress(self.loss_history, save_file_path=self.progress_path)
             self.lr_scheduler.step()
             
@@ -218,5 +222,8 @@ if __name__ == "__main__":
 
     with open('./config/config.yaml') as f:
         cfg = yaml.safe_load(f)
+    import time
+    a = time.time()
     # train(cfg, args)
+    # print(time.time()-a)
     multi_train(cfg, args)
