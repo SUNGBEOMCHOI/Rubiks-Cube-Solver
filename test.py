@@ -1,17 +1,21 @@
 import argparse
+import matplotlib.patches as mpatches
+import winsound as sd
 
 import torch
 import os
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
 
 import yaml
-
 from model import DeepCube
 from env import make_env
 from utils import get_env_config
-import matplotlib.colors as colors
+from mcts import MCTS
+
+# mcts, mask, size
 
 def test(cfg, mode = 'show'):
     """
@@ -26,30 +30,39 @@ def test(cfg, mode = 'show'):
     device = torch.device('cuda' if cfg['device']=='cuda' and torch.cuda.is_available() else 'cpu')
     cube_size = cfg['test']['cube_size']
     state_dim, action_dim = get_env_config(cube_size)
-    hidden_dim = cfg['model']['hidden_dim']
-    deepcube = DeepCube(state_dim, action_dim, hidden_dim).to(device)
-    env = make_env(device, cube_size)
+    # hidden_dim = cfg['model']['hidden_dim']
     test_model_path = cfg['test']['test_model_path']
     save_file_path = cfg['test']['save_file_path']
     show_scramble_count = cfg['test']['show_scramble_count']
     
     os.makedirs(test_model_path, exist_ok = True)
     os.makedirs(save_file_path, exist_ok = True)
+    env = make_env(device, cube_size)
 
     if mode == 'save':
         time1 = time.time()
-        plot_test_solve_percentage(deepcube, env, cfg, device) # max 200일 때 750초
-        # plot_test_distribution_and_dispersion(deepcube, env, cfg, device)
+        # plot_test_solve_percentage(env, cfg, device) # max 200일 때 750초
+        plot_test_distribution_and_dispersion(env, cfg, device) #max 200일 때 600초
         print(time.time()-time1)
         pass
     elif mode == 'show': # 화면에 띄우기
-        deepcube.load_state_dict(torch.load(test_model_path + '\\model_7500.pt', map_location = device)['model_state_dict'])
-        _, _, trial_result, action_list = trial(deepcube, env, cfg, show_scramble_count, seed=None, mask=True, save=False)
+        model_name = os.listdir(test_model_path)[0]
+        deepcube = model_load(test_model_path, model_name, device, state_dim, action_dim)
+        time1 = time.time()
+        _, _, trial_result, action_list = trial(deepcube, env, cfg, show_scramble_count, seed=None, mask=False, mcts_=False)
         analysis(action_list, trial_result, mode)
+        print(time.time()-time1)
         # trial 결과 나왔으니 시뮬레이션 띄우기 
         pass
     else : # show랑 save 둘다 아님
         raise ValueError('You can only choose \"show\" or \"save\" as mode factor')
+
+def model_load(test_model_path, model_name, device, state_dim, action_dim):
+    model_state = torch.load(f'{test_model_path}\{model_name}', map_location = device)
+    hidden_dim = [model_state['optimizer_state_dict']['state'][x]['exp_avg'].size(0) for x in [1, 3, 5]]
+    model = DeepCube(state_dim, action_dim, hidden_dim).to(device)
+    model.load_state_dict(model_state['model_state_dict'])
+    return model
 
 def analysis(action_list, trial_result, mode):
     """
@@ -59,44 +72,40 @@ def analysis(action_list, trial_result, mode):
         trial_result: True of False
         mode: show(print result) or save(hide result)
     Return:
-        result: numpy ndarray[성공, 한방향, 반복, 주기성(n >= 3), 모름]
+        result: numpy ndarray[성공, 한방향, 반복, 주기(n >= 3), 예외]
     """
-    if mode == 'show':
-        print(action_list)
-    result = np.zeros(5)
+    result = np.zeros(5, dtype='int64')
     if trial_result:
         result[0]+=1
-        if mode == 'show':
-            print('완성')
-    else:
-        try:
-            for idx in range(6, len(action_list)):
-                if action_list[-2:] == action_list[-4:-2] and action_list[-2:] != action_list[-3:-1] and action_list[-6:-4] == action_list[-4:-2]:
-                    result[1]+=1
-                    if mode == 'show':
-                        print('두 상태를 왔다갔다 하는 중')
-                    break
-                elif action_list[-2:] == action_list[-4:-2] and action_list[-2:] == action_list[-3:-1] and action_list[-3:] == action_list[-6:-3]:
-                    result[2]+=1
-                    if mode == 'show':
-                        print('한 방향으로만 진행 중')
-                    break
-                elif action_list[-idx:] == action_list[-2*idx:-idx]:
-                    result[3]+=1
-                    if mode == 'show':
-                        print('주기성을 가지고 계속 같은 state로 돌아옴')
-                    break
-                else:
-                    if idx == len(action_list)-1 :
-                        result[4]+=1
-                        # print(action_list, 'max_timestep>200 / 뜨면 알려주세요', sep = '\n')
+    else:        
+        for idx in range(0, len(action_list)):
+            if action_list[-2:] == action_list[-4:-2] and action_list[-2:] != action_list[-3:-1] and action_list[-6:-4] == action_list[-4:-2]:
+                result[1]+=1
+                break
+            elif action_list[-2:] == action_list[-4:-2] and action_list[-2:] == action_list[-3:-1] and action_list[-3:] == action_list[-6:-3]:
+                result[2]+=1
+                break
+            else:
+                try:
+                    for x in range(4,14):
+                        if action_list[-(x+idx):-idx] == action_list[-(2*x+idx):-(idx+x)]:
+                            result[3]+=1
+                            break
+                except:
                     pass
-        except:
-            pass
+            if idx == len(action_list)-1 :
+                result[4]+=1
+                pass
+        if mode == 'show':
+            output = ['완성', "like U U' U U'", "like U U U U", '주기(n>3)', '예외']
+            for x in range(5):
+                if result[x] == 1:
+                    print(output[x], action_list, sep='\n')
+                else:
+                    pass
     return result
-        
 
-def trial(model, env, cfg, scramble_count, seed = None, mask=True):
+def trial(model, env, cfg, scramble_count, seed = None, mask=False, mcts_=False):
     """
     Try to solve a cube with given state
     Args:
@@ -105,143 +114,106 @@ def trial(model, env, cfg, scramble_count, seed = None, mask=True):
         cfg: Which contains trial configuration
         scramble_count: scramble count
         seed: seed to apply scrambling cube except None (default to None)
-        mask:
+        mask: True or False
+        mcts_: True or False
 
     Returns:
-        solve_count: count to solve a cube  
-        solve_time: time to solve a cube (sec)
+        solve_scramble_count: count to solve a cube  
+        solve_time_time: time to solve a cube (sec)
         trial_result: True or False
     """
     max_timesteps = cfg['test']['max_timesteps']
-    solve_count, solve_time, trial_result = 0, 0, 0
+    solve_scramble_count, solve_time_time, trial_result = 0, 0, 0
     state, done, pre_action = env.reset(seed, scramble_count), False, None
     start_time = time.time()
+    if mcts_:
+        mcts = MCTS(model, cfg)
     action_list=[]
     for timestep in range(1, max_timesteps+1):
-        with torch.no_grad():
-            state_tensor = torch.tensor(state).float().detach()
-            if mask:
-                action = model.get_action(state_tensor, pre_action)
-            else:
-                action = model.get_action(state_tensor)
-            action_list.append(action)
-            pre_action = action
-
-        next_state, _, done, _ = env.step(action)
+        if mcts_ == False:
+            with torch.no_grad():
+                state_tensor = torch.tensor(state).float().detach()
+                if mask:
+                    action = model.get_action(state_tensor, pre_action)
+                    pre_action = action
+                else:
+                    action = model.get_action(state_tensor)
+                action_list.append(action)
+            next_state, _, done, _ = env.step(action)
+        else:
+            with torch.no_grad():
+                action = mcts.getActionProb(state, env, temp=0)
+            action_list.append(action.index(1))
+            next_state, _, done, _ = env.step(action.index(max(action)))
         if done:
-            solve_count = timestep
-            solve_time = time.time() - start_time
+            solve_scramble_count = timestep
+            solve_time_time = time.time() - start_time
             trial_result = 1
             break
         state = next_state
         if timestep == max_timesteps:
-            solve_count = None
-            solve_time = time.time() - start_time
-    return solve_count, solve_time, trial_result, action_list
+            solve_scramble_count = None
+            solve_time_time = time.time() - start_time
+    return solve_scramble_count, solve_time_time, trial_result, action_list
 
-def plot_test_solve_percentage(model, env, cfg, device):
-    """
-    Make plot which shows solve percentage by scramble counts
-    Args:
-        model: trained DeepCube model
-        env: Cube environment
-        cfg: Which contains trial configuration
-        device:
-        masks: 'only' or 'both'
-    """
-
-    test_model_path = cfg['test']['test_model_path']
-    save_file_path = cfg['test']['save_file_path']
-    trial_scramble_count = 30
-    trial_cube_count = 50
-    model_list = os.listdir(test_model_path)
-    colors_list = list(colors._colors_full_map.values())
-    masks = cfg['test']['masks']
-    if masks == 'only' :
-        masks = [True]
-    elif masks == 'both':
-        masks = [True, False]
+def data_for_plot(model, env, cfg, trial_scramble_count, trial_cube_count, mask, mcts_, iter):
+    if iter:
+        result1 = np.zeros((3, 1, trial_scramble_count, trial_cube_count))
+        result2 = np.zeros((5, 1, trial_scramble_count, trial_cube_count), dtype='int64')
+        for scramble_count in range(1, trial_scramble_count+1):
+            for cube_count in range(trial_cube_count):
+                solve_scarmable_count, solve_time_time, trial_result, action_list = trial(model, env, cfg, scramble_count, seed = cube_count, mask=mask, mcts_=mcts_)
+                result2[:,0,scramble_count-1,cube_count] += analysis(action_list, trial_result, mode='save')
+                result1[:,0,scramble_count-1,cube_count] = np.array([solve_scarmable_count, solve_time_time, trial_result])
     else:
-        masks = [False]
+        result1 = np.zeros((3, 1, 1, trial_cube_count))
+        result2 = ''
+        for cube_count in range(trial_cube_count):
+            solve_scarmable_count, solve_time_time, trial_result, action_list = trial(model, env, cfg, trial_scramble_count, seed = cube_count, mask=mask, mcts_=mcts_)
+            result1[:,0,0,cube_count] = np.array([solve_scarmable_count, solve_time_time, trial_result])
+    return result1, result2
 
+def set_option(model_list, masks, mcts_):
+    result = []
+    for x in model_list:
+        for y in masks:
+            for z in mcts_:
+                result.append([x, y, z])
+    return result
+
+def plot_solve_ratio(array, options, colors_list, save_file_path):
     fig, ax = plt.subplots(figsize = (6,6), facecolor = '#c1f1f1')
     ax.set_title('Difficulty vs Solve Percentage')
     ax.set_xlabel('Scramble Distance')
     ax.set_ylabel('Percentage solved(%)')
-
-
-    cube_size = cfg['test']['cube_size']
-    state_dim, action_dim = get_env_config(cube_size)
-    size = [[256, 64, 32], [512, 128, 64], [128, 32, 16],[64, 16, 8]]
-    result=np.zeros([len(model_list)*len(masks), trial_scramble_count, 5])
-    name_list = []
-    for idxs, model_name in enumerate(model_list):
-        model = DeepCube(state_dim, action_dim, size[idxs]).to(device)
-        model.load_state_dict(torch.load(test_model_path + '/' + model_name, map_location = device)['model_state_dict'])
-
-        solve_count_table = np.zeros((trial_scramble_count, trial_cube_count))
-        solve_time_table = np.zeros((trial_scramble_count, trial_cube_count))
-        trial_result_table = np.zeros((trial_scramble_count, trial_cube_count))
-        
-        for idx, mask in enumerate(masks):
-            name_list.append(f'{"Mask"*mask} {model_name[:-14]}')
-            for scramble_count in range(1, trial_scramble_count+1):
-                tmp = np.zeros(5)
-                for cube_count in range(trial_cube_count):
-                    solve_count, solve_time, trial_result, action_list = trial(model, env, cfg, scramble_count, seed=cube_count, mask=mask)
-                    tmp += analysis(action_list, trial_result, mode = 'save')
-
-                    solve_count_table[scramble_count-1][cube_count] = solve_count
-                    solve_time_table[scramble_count-1][cube_count] = solve_time
-                    trial_result_table[scramble_count-1][cube_count] = trial_result
-                result[idxs*len(masks)+idx][scramble_count-1] = tmp
-            scramble_distance_list = [i for i in range(1, trial_scramble_count+1)]
-            solve_count_list = [trial_result_table[scramble_count-1].mean() * 100 for scramble_count in range(1, trial_scramble_count+1)]
-            ax.plot(scramble_distance_list, solve_count_list, '--', label = f'{"Mask"*mask} {model_name[:-3]}')
-
+    x=range(1, len(array[0,0,:,0])+1)
+    for idx, option in enumerate(options):
+        y=[array[2, idx, x-1, :,].mean()*100 for x in range(1, len(array[0,0,:,0])+1)]
+        ax.plot(x, y, '--', label = f"{'MCTS'*option[2]}{'Mask'*option[1]}{option[0][:-14]}", color = colors_list[idx])
     ax.legend(loc = 'upper right')
-    ax.set_xticks(np.linspace(1, trial_scramble_count+1, 7, endpoint = True))
+    ax.set_xticks(np.linspace(1, len(array[0,0,:,0])+1, 7, endpoint = True))
     ax.set_yticks(np.linspace(0, 100, 6, endpoint = True))
     plt.savefig(f'{save_file_path}/Difficulty vs Solve Percentage.png', dpi = 300)
-    # plt.show()
-    
-    for idx in range(len(result[:,0,0])): #모델 별
+
+def plot_analysis(array, options, colors_list, save_file_path):
+    list_legend = ['success', "like U U' U U'", "like U U U U", 'periodic', 'exception']
+    for idx, option in enumerate(options): #모델 별
         fig, ax = plt.subplots(figsize=(12,6), facecolor = '#c1f1f1')
         ax.set_title('Analysis of results')
-        ax.set_xlabel('Example counts')
-        ax.set_ylabel('Scramble counts')
-        for category in range(len(result[0,0])):
-            ax.bar(x=range(1, len(result[idx,:,0])+1), height=result[idx,:,category], width=0.7, color = colors_list[category], bottom=result[idx,:,:category].sum(axis=1))
-        ax.set_xticks(range(1, trial_scramble_count+1, 5))
-        ax.set_yticks(range(0, trial_cube_count+1, 10))
-        plt.savefig(f'{save_file_path}/{name_list[idx]} analysis.png', dpi = 300)
+        ax.set_ylabel('Example counts')
+        ax.set_xlabel('Scramble counts')
+        for category in range(len(array[:,0,0,0])):
+            x=range(1, len(array[0,0,:,0])+1)
+            height=array[category,idx,:,:].sum(axis=1)
+            bottom=array[:category,idx,:,:].sum(axis=0).sum(axis=1)
+            ax.bar(x, height, width=0.7, color = colors_list[category], bottom=bottom)
+        ax.set_xticks(range(1, len(array[0,0,:,0])+1, 5))
+        ax.set_yticks(range(0, len(array[0,0,0,:])+6, 5))
+        plt.legend(handles=[mpatches.Patch(color=colors_list[x], label=list_legend[x]) for x in range(5)],
+                            loc = 'upper center', mode = "expand", ncol=5)
+        plt.savefig(f"{save_file_path}/{'MCTS'*option[2]}{'Mask'*option[1]}{option[0][:-14]} analysis.png", dpi = 300)
 
-def plot_test_distribution_and_dispersion(model, env, cfg, device):
-    """
-    Make histogram which shows distribution of solve times and boxplot which shows dispersion of scramble counts 
-    Args:
-        model: trained DeepCube model
-        env: Cube environment
-        cfg: Which contains trial configuration
-        device:
-        masks: 'only' or 'both'
-    """
-    cube_size = cfg['test']['cube_size']
-    state_dim, action_dim = get_env_config(cube_size)
-    size = [[256, 64, 32], [512, 128, 64], [128, 32, 16],[64, 16, 8]]
-    test_model_path = cfg['test']['test_model_path']
-    save_file_path = cfg['test']['save_file_path']
-    trial_scramble_count = 1000
-    trial_cube_count = 640
-    model_list = os.listdir(test_model_path)
-    masks = cfg['test']['masks']
-    if masks == 'only' :
-        masks = [True]
-    elif masks == 'both':
-        masks = [True, False]
-    else:
-        masks = [False]
-
+def plot_ditribution_dispersion(array, options, colors_list, save_file_path):
     fig, axes = plt.subplots(2,1, figsize = (6,12), facecolor = '#c1f1f1')
     ax2 = axes[1].twinx()
     axes[0].set_title('Distribution of Solve Time')
@@ -250,41 +222,82 @@ def plot_test_distribution_and_dispersion(model, env, cfg, device):
     axes[1].set_title('Dispersion of Scramble Counts')
     axes[1].set_xlabel('Model')
     axes[1].set_ylabel('Number of moves')
-    xlabel_list = []
-
-    for idx1, model_name in enumerate(model_list):
-        model = DeepCube(state_dim, action_dim, size[idx1]).to(device)
-        model.load_state_dict(torch.load(test_model_path + '\\' + model_name, map_location = device)['model_state_dict'])
-
-        solve_count_table = np.zeros(trial_cube_count)
-        solve_time_table = np.zeros(trial_cube_count)
-        trial_result_table = np.zeros(trial_cube_count)
-        
-        for idx2, mask in enumerate(masks):
-            for cube_count in range(trial_cube_count):
-                seed = cube_count
-                solve_count, solve_time, trial_result, _ = trial(model, env, cfg, trial_scramble_count, seed, mask=mask)
-                
-                solve_count_table[cube_count] = solve_count
-                solve_time_table[cube_count] = solve_time
-                trial_result_table[cube_count] = trial_result
-            
-            solve_time_list_s = solve_time_table[~np.isnan(solve_count_table)]
-            axes[0].hist(solve_time_list_s, range=(0, 0.04), bins=40, alpha = 0.9, label = f'{"Mask"*mask} {model_name[:-3]}', histtype='step')
-            axes[1].boxplot(solve_count_table[~np.isnan(solve_count_table)], positions=range(idx1*2+idx2+1, idx1*2+idx2+2))
-            ax2.axhline(trial_result_table.mean()*100, xmin=(idx1*2+idx2+0.5-0.2)/((len(masks)) * len(model_list)),
-                                          xmax=(idx1*2+idx2+0.5+0.2)/((len(masks)) * len(model_list)), color = 'red', linestyle='--')
-            xlabel_list.append(f'{"Mask"*mask} {model_name[:-3]}')
-    
-        axes[0].legend(loc = 'upper right')
-        if len(xlabel_list) < 5:  
-            axes[1].set_xticklabels(xlabel_list)
-        else:
-            axes[1].set_xticklabels(range(1, len(xlabel_list)+1))
+    #array [3, idx, 1, 640]
+    xlabel_list=[]
+    for idx, option in enumerate(options):
+        axes[0].hist(array[1,idx,0,~np.isnan(array[0,idx,0,:])], range=(0,0.04), bins=40, alpha=0.9, color=colors_list[idx],
+                     label=f"{'MCTS'*option[2]}{'Mask'*option[1]}{option[0][:-14]}", histtype='step')
+        axes[1].boxplot(array[0,idx,0,~np.isnan(array[0,idx,0,:])], positions=[idx])
+        ax2.axhline(y = array[2,idx,0,:].mean()*100, xmin=idx/len(options), xmax=(idx+1)/len(options), color='red', linestyle='--')
+        xlabel_list.append(f"{'MCTS'*option[2]}{'Mask'*option[1]}{option[0][:-14]}")
+    axes[0].legend(loc='upper right')
+    if len(xlabel_list) < 5:
+        axes[1].set_xticklabels(xlabel_list)
         ax2.set_yticks(range(0, 101, 10))
-
     plt.savefig(f'{save_file_path}/Dispersion of scramble count.png', dpi = 300)
-    # plt.show()
+
+def plot_test_solve_percentage(env, cfg, device):
+    """
+    Make plot which shows solve percentage by scramble counts
+    Args:
+        env: Cube environment
+        cfg: Which contains trial configuration
+        device:
+        masks: 'only' or 'both'
+    """
+    trial_scramble_count = 30
+    trial_cube_count = 50
+    test_model_path = cfg['test']['test_model_path']
+    save_file_path = cfg['test']['save_file_path']
+    model_list = os.listdir(test_model_path)
+    colors_list = list(colors._colors_full_map.values())
+    dicts = {'only':[True],'both':[True, False],'x':[False]}
+    masks = dicts[cfg['test']['masks']]
+    mcts_ = dicts[cfg['test']['mcts_']]
+    options = set_option(model_list, masks, mcts_)
+    cube_size = cfg['test']['cube_size']
+    state_dim, action_dim = get_env_config(cube_size)
+
+    result1 = np.zeros((3, len(options), trial_scramble_count, trial_cube_count))
+    result2 = np.zeros((5, len(options), trial_scramble_count, trial_cube_count))
+    for idx, option in enumerate(options):
+        deepcube = model_load(test_model_path, option[0], device, state_dim, action_dim)
+        result1[:,idx:idx+1,:,:], result2[:,idx:idx+1,:,:] = data_for_plot(deepcube, env, cfg, trial_scramble_count, trial_cube_count, mask=option[1], mcts_=option[2], iter=True)
+
+    plot_solve_ratio(result1, options, colors_list, save_file_path)
+    plot_analysis(result2, options, colors_list, save_file_path)
+
+def plot_test_distribution_and_dispersion(env, cfg, device):
+    """
+    Make histogram which shows distribution of solve times and boxplot which shows dispersion of scramble counts 
+    Args:
+        env: Cube environment
+        cfg: Which contains trial configuration
+        device:
+    """
+    trial_scramble_count = 1000
+    trial_cube_count = 640
+    test_model_path = cfg['test']['test_model_path']
+    save_file_path = cfg['test']['save_file_path']
+    model_list = os.listdir(test_model_path)
+    colors_list = list(colors._colors_full_map.values())
+    dicts = {'only':[True],'both':[True, False],'x':[False]}
+    masks = dicts[cfg['test']['masks']]
+    mcts_ = dicts[cfg['test']['mcts_']]
+    options = set_option(model_list, masks, mcts_)
+    cube_size = cfg['test']['cube_size']
+    state_dim, action_dim = get_env_config(cube_size)
+
+    result1 = np.zeros((3, len(options), trial_scramble_count, trial_cube_count))
+    for idx, option in enumerate(options):
+        deepcube = model_load(test_model_path, option[0], device, state_dim, action_dim)
+        result1[:,idx:idx+1,0:1,:], _ = data_for_plot(deepcube, env, cfg, trial_scramble_count, trial_cube_count, mask=option[1], mcts_=option[2], iter=False)
+    plot_ditribution_dispersion(result1, options, colors_list, save_file_path)
+
+def beepsound():
+    fr = 2000    # range : 37 ~ 32767
+    du = 1000     # 1000 ms ==1second
+    sd.Beep(fr, du) # winsound.Beep(frequency, duration)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -294,3 +307,4 @@ if __name__ == "__main__":
     with open('./config/config.yaml') as f:
         cfg = yaml.safe_load(f)
     test(cfg, mode = 'save')
+    beepsound()
