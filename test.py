@@ -16,7 +16,6 @@ import matplotlib.colors as colors
 def test(cfg, mode = 'show'):
     """
     Test our model
-
     Args:
         cfg: Which contains trial configuration
         mode: show(directly pop up video) or save(save test result graphs)
@@ -106,7 +105,6 @@ def trial(model, env, cfg, scramble_count, seed = None, mask=True):
         scramble_count: scramble count
         seed: seed to apply scrambling cube except None (default to None)
         mask:
-
     Returns:
         solve_count: count to solve a cube  
         solve_time: time to solve a cube (sec)

@@ -190,7 +190,6 @@ class ReplayBuffer(Dataset):
     def update(self, idx, error):
         """
         Update error of replay buffer
-
         Args:
             idx: Index of replay memory you want to change
             error: New error

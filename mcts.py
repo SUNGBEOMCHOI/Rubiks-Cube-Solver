@@ -40,7 +40,6 @@ class MCTS():
         state.
         Args:
             state : numpy array which represent state  (7,21)
-
         Returns:
             probs: a policy vector where the probability of the ith action is
                    proportional to Nsa[(s,a)]**(1./temp)   , list type
@@ -81,23 +80,19 @@ class MCTS():
         This function performs one iteration of MCTS. It is recursively called
         till a leaf node is found. The action chosen at each node is one that
         has the maximum upper confidence bound as in the paper.
-
         Once a leaf node is found, the neural network is called to return an
         initial policy P and a value v for the state. This value is propagated
         up the search path. In case the leaf node is a terminal state, the
         outcome is propagated up the search path. The values of Ns, Nsa, Qsa are
         updated.
-
         NOTE: the return values are the negative of the value of the current
         state. This is done since v is in [-1,1] and if v is the value of a
         state for the current player, then its value is -v for the other player.
-
         Args:
             state : numpy array which represent state  (7,21)
             depth : depth of node
             previous_action : integer(0-action_dim) which represent previous action
             env_ended : Boolean type
-
         Returns:
             v: the negative of the value of the current state (if state is terminal, return 1)
         """
@@ -182,4 +177,3 @@ class MCTS():
             depth_list[key[0]].append(encoded_state[key[1]])
         
         print(depth_list)
-

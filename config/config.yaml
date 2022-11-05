@@ -1,23 +1,23 @@
 train:
   batch_size: 256
-  sample_size: 10000
+  sample_size: 1000
   learning_rate: 0.001
-  epochs: 10000
+  epochs: 10
   sample_epoch: 1
-  sample_scramble_count: 30
+  sample_scramble_count: 3
   sample_cube_count: 100
   buffer_size: 50000
   temperature: 0.3
-  validation_epoch: 100
+  validation_epoch: 10
   video_path: ./video
   model_path: ./pretrained
   progress_path: ./train_progress
 validation:
-  max_timesteps: 200
-  sample_scramble_count: 30
-  sample_cube_count: 10
+  max_timesteps: 20
+  sample_scramble_count: 3
+  sample_cube_count: 5
 env:
-  cube_size: 2
+  cube_size: 3
 model:
   hidden_dim:
     - 256
