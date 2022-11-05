@@ -13,7 +13,7 @@ train:
   model_path: ./pretrained
   progress_path: ./train_progress
 validation:
-  max_timesteps: 200
+  max_timesteps: 50
   sample_scramble_count: 30
   sample_cube_count: 10
 env:
@@ -25,8 +25,9 @@ model:
     - 32
 device: cuda
 mcts:
-  numMCTSSim: 10
+  numMCTSSim: 50
   cpuct: 1.0
+  virtual_loss_const: 150
 test:
   cube_size: 2
   test_model_path: './test/model'
