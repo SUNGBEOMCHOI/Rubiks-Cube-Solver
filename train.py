@@ -98,7 +98,7 @@ def validation(model, env, valid_history, epoch, device, cfg):
         solve_count = 0
         for idx in range(1, sample_cube_count+1):
             if idx == sample_cube_count and scramble_count==sample_scramble_count: # 마지막 state
-                # env.render()
+                env.render()
                 pass
             state, done = env.reset(seed[idx-1], scramble_count), False
             for timestep in range(1, max_timesteps+1):
@@ -113,8 +113,8 @@ def validation(model, env, valid_history, epoch, device, cfg):
                     break
                 state = next_state
             if idx == sample_cube_count and scramble_count==sample_scramble_count: # 마지막 state render종료
-                # env.save_video(cube_size = env.cube_size, scramble_count = scramble_count, sample_cube_count = sample_cube_count, video_path = video_path)
-                # env.close_render()
+                env.save_video(cube_size = env.cube_size, scramble_count = scramble_count, sample_cube_count = sample_cube_count, video_path = video_path)
+                env.close_render()
                 pass
         solve_percentage = (solve_count/sample_cube_count) * 100
         valid_history[epoch]['solve_percentage'].append(solve_percentage)

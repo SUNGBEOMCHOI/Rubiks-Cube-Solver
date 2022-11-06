@@ -69,14 +69,14 @@ class CubeEnv(gym.Env):
                 reward = -1.0
         elif self.cube_size == 3:
             sim_action = self.action_to_sim_action[self.cube_size][action]
-            self.sim_cube = self.sim_cube.perform_step(sim_action)
-            self.cube = self.sim_state_to_state(self.sim_cube)
-            if isSolved_(self.sim_cube):
+            # if isSolved_(self.sim_cube):
+            if isSolved_(self.sim_cube.perform_step(sim_action)):
                 done = True
                 reward = 1.0
             else:
                 done = False
                 reward = -1.0
+            self.cube = self.sim_state_to_state(self.sim_cube)
         else:
             raise NotImplementedError
         
@@ -209,11 +209,8 @@ class CubeEnv(gym.Env):
             self.init_state()
             action_sequence = np.random.randint(self.action_dim, size=sample_scramble_count)
             for scramble_idx, action in enumerate(action_sequence):
-                # print("action: ", action)
                 state, _, _, _ = self.step(action)
-                # print(self.sim_cube.perform_step(self.action_to_sim_action[self.cube_size][action]))
                 target_value, target_policy, error = self.get_target_value(model, scramble_idx+1, temperature)
-                # print("target action: ", target_policy)
                 sample = self.transaction(state, target_value, target_policy, scramble_idx+1, error)
                 replay_buffer.append(sample)
 
@@ -235,34 +232,28 @@ class CubeEnv(gym.Env):
                 reward_list.append(reward)
             elif self.cube_size == 3:
                 sim_action = self.action_to_sim_action[self.cube_size][action]
-                # sim_cube_copy = copy.deepcopy(self.sim_cube)
-                next_sim_cube = self.sim_cube.perform_step(sim_action)
-                next_state = self.sim_state_to_state(next_sim_cube)
-                # next_state_tensor = torch.tensor(next_state, device=self.device).float()
+                
+                # next_sim_cube = self.sim_cube.perform_step(sim_action)
+                # next_state = self.sim_state_to_state(next_sim_cube)
+                
                 if action % 2 == 0:
                     counter_action = action + 1
                 else:
                     counter_action = action - 1
 
-                self.sim_cube.perform_step(self.action_to_sim_action[self.cube_size][counter_action])
-                if isSolved_(next_sim_cube):
+                
+                # if isSolved_(next_sim_cube):
+                if isSolved_(self.sim_cube.perform_step(sim_action)):
                     reward = 1.0
                     target_value, target_policy = 1.0, action
-                    print("#################")
-                    print("PREV")
-                    print(self.sim_cube)
-                    print("#################")
-                    print(action)
-                    print(counter_action)
-                    print("#################")
-                    print("NEXT")
-                    print(next_sim_cube)
-                    # break
+                    break
                 else:
                     reward = -1.0
 
+                # next_state = self.sim_state_to_state(self.sim_cube)
+                next_state_list.append(self.sim_state_to_state(self.sim_cube))
+                self.sim_cube.perform_step(self.action_to_sim_action[self.cube_size][counter_action])
                 
-                next_state_list.append(next_state)
                 reward_list.append(reward)
             else:
                 raise NotImplementedError
