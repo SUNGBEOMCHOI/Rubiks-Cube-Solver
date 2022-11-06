@@ -44,16 +44,29 @@ def train(cfg, args):
     #      Train settings      #
     ############################
     deepcube = DeepCube(state_dim, action_dim, hidden_dim).to(device)
-    env = make_env(device, cube_size)
-    start_epoch = 1
+    if num_processes: # Use multi process
+        deepcube.share_memory() # global model
+        optimizer = optim_func(deepcube, learning_rate)
+        optimizer.share_memory()
+        lr_scheduler = scheduler_func(optimizer)
+        
+        BaseManager.register('defaultdict', defaultdict, DictProxy)
+        mgr = BaseManager()
+        mgr.start()
+        loss_history = mgr.defaultdict(dict)
+        valid_history = mgr.defaultdict(dict)
+    else:
+        env = make_env(device, cube_size)
+        start_epoch = 1
 
-    criterion_list = loss_func()
-    optimizer = optim_func(deepcube, learning_rate)
-    lr_scheduler = scheduler_func(optimizer)
+        criterion_list = loss_func()
+        optimizer = optim_func(deepcube, learning_rate)
+        lr_scheduler = scheduler_func(optimizer)
+        lr_scheduler = None
 
-    replay_buffer = ReplayBuffer(buffer_size, sample_size)
-    loss_history = defaultdict(lambda: {'loss':[]})
-    valid_history = defaultdict(lambda: {'solve_percentage':[]})
+        replay_buffer = ReplayBuffer(buffer_size, sample_size)
+        loss_history = defaultdict(lambda: {'loss':[]})
+        valid_history = defaultdict(lambda: {'solve_percentage':[]})
 
     os.makedirs(video_path, exist_ok=True)
     os.makedirs(model_path, exist_ok=True)
@@ -65,15 +78,6 @@ def train(cfg, args):
         deepcube.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
-
-    if num_processes: # Use multi process
-        deepcube.share_memory() # global model
-        
-        BaseManager.register('defaultdict', defaultdict, DictProxy)
-        mgr = BaseManager()
-        mgr.start()
-        loss_history = mgr.defaultdict(dict)
-        valid_history = mgr.defaultdict(dict)
     
     ############################
     #       train model        #
@@ -86,7 +90,7 @@ def train(cfg, args):
         [w.start() for w in workers]
         [w.join() for w in workers]
 
-    else: # 
+    else:
         for epoch in tqdm(range(start_epoch, epochs+1)):
             if (epoch-1) % sample_epoch == 0: # replay buffer에 random sample저장
                 env.get_random_samples(replay_buffer, deepcube, sample_scramble_count, sample_cube_count)
@@ -134,19 +138,21 @@ def single_train(worker_idx, local_epoch_max, global_deepcube, optimizer, lr_sch
     loss_history = loss_history
 
     while local_epoch < local_epoch_max:
-        global_epoch = num_processes * local_epoch + worker_idx
+        # global_epoch = num_processes * local_epoch + worker_idx
         local_epoch += 1
-        print(f"Train progress : {global_epoch} / {epochs}")
         if (local_epoch-1) % sample_epoch == 0:
             env.get_random_samples(replay_buffer, deepcube, sample_scramble_count, sample_cube_count)
+        deepcube.load_state_dict(global_deepcube.state_dict())
         loss = update_params(deepcube, replay_buffer, criterion_list, optimizer, batch_size, device, temperature, global_deepcube)
+        global_epoch = len(loss_history)+1
         loss_history[global_epoch] = {'loss':[loss]}
+        print(f"Train progress : {global_epoch} / {epochs} Loss : {loss}")
         if global_epoch % validation_epoch == 0:
             plot_progress(loss_history, save_file_path=progress_path)
-            validation(deepcube, env, valid_history, global_epoch, device, cfg)
+            validation(global_deepcube, env, valid_history, global_epoch, device, cfg)
             plot_valid_hist(valid_history, save_file_path=progress_path, validation_epoch=validation_epoch)
             save_model(global_deepcube, global_epoch, optimizer, lr_scheduler, model_path)
-        lr_scheduler.step()
+        # lr_scheduler.step()
 
 def validation(model, env, valid_history, epoch, device, cfg):
     """

@@ -1,15 +1,15 @@
 train:
-  batch_size: 256
+  batch_size: 512
   sample_size: 10000
-  learning_rate: 0.001
+  learning_rate: 0.00005
   epochs: 10000
   sample_epoch: 1
   sample_scramble_count: 30
   sample_cube_count: 100
-  buffer_size: 30000
+  buffer_size: 50000
   temperature: 0.3
   validation_epoch: 100
-  num_processes: 64
+  num_processes: 14
   video_path: ./video
   model_path: ./pretrained
   progress_path: ./train_progress
@@ -24,7 +24,7 @@ model:
     - 256
     - 64
     - 32
-device: cuda
+device: cpu
 mcts:
   numMCTSSim: 10
   cpuct: 1.0
