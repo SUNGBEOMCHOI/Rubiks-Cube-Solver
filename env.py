@@ -1,5 +1,6 @@
-import math
+import time
 from collections import namedtuple
+import multiprocessing as mp
 
 import numpy as np
 import gym
@@ -157,12 +158,21 @@ class Cube(gym.Env):
         for sample_cube_idx in range(1, sample_cube_count+1):
             self.init_state()
             action_sequence = np.random.randint(self.action_dim, size=sample_scramble_count)
+            a = time.time()
+            sam, step  = 0.0, 0.0
+
             for scramble_idx, action in enumerate(action_sequence):
+                b = time.time()
                 state, _, _, _ = self.step(action)
+                step += time.time() - b
+                b = time.time()
                 target_value, target_policy, error = self.get_target_value(model, scramble_idx+1, temperature)
+                sam += time.time() - b
                 # sample = self.transaction(state, target_value, target_policy, scramble_idx+1, error)
                 sample = {'state':state, 'target_value':target_value, 'target_policy':target_policy, 'scramble_count':scramble_idx+1, 'error':error}
                 replay_buffer.append(sample)
+            # print('sam', sam)
+            # print('step', step)
         
                 
 
@@ -242,19 +252,25 @@ class Cube(gym.Env):
                 raise NotImplementedError
             else:
                 raise NotImplementedError
+        # print('move', move)
+        # print('sim_to', sim_to)
+        # print('solve', solve)
+        # print('tar', time.time() - b)
+        
         if reward != 1.0:
             next_state_tensor = torch.tensor(np.array(next_state_list), device=self.device).float() # action_dim, state_dim[0], state_dim[1]
             reward_tensor = torch.tensor(reward_list, device = self.device) # action_dim
             with torch.no_grad():
                 next_value, _ = model(next_state_tensor)
                 value = next_value.squeeze(dim=-1).detach() + reward_tensor
-            target_value, target_policy = torch.max(value, -1, keepdim=True)
-            target_value, target_policy = target_value.item(), target_policy.item()
-        weight = scramble_count ** (-1*temperature)
-        with torch.no_grad():
-            state_tensor = torch.tensor(self.cube, device=self.device).float()
-            value, _ = model(state_tensor)
-            error = abs(value.detach().item() - target_value)
+        #     target_value, target_policy = torch.max(value, -1, keepdim=True)
+        #     target_value, target_policy = target_value.item(), target_policy.item()
+        # with torch.no_grad():
+        #     state_tensor = torch.tensor(self.cube, device=self.device).float()
+        #     value, _ = model(state_tensor.detach())
+        #     error = abs(value.detach().item() - target_value)
+        target_value, target_policy, error = 0.0, 0.0, 0.0
+        
         return target_value, target_policy, error
 
 if __name__ == "__main__":

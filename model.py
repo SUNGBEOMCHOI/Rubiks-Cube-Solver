@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.distributions import Categorical
+import multiprocessing as mp
 
 class DeepCube(nn.Module):
     def __init__(self, state_dim, action_dim, hidden_dim):
@@ -25,6 +26,7 @@ class DeepCube(nn.Module):
             nn.ELU(),
             nn.Linear(self.hidden_dim[2], 1)
         )
+        self.count = 0
 
     def forward(self, x):
         """

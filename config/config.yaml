@@ -9,7 +9,7 @@ train:
   buffer_size: 50000
   temperature: 0.3
   validation_epoch: 100
-  num_processes: 4
+  num_processes: 2
   video_path: ./video
   model_path: ./pretrained
   progress_path: ./train_progress

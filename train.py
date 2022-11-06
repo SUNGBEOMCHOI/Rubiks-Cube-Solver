@@ -1,13 +1,17 @@
 import os
+import time
 import argparse
 from collections import defaultdict
 from multiprocessing.managers import BaseManager, DictProxy
+import multiprocessing as mp
+import copy
 
 import yaml
 from tqdm import tqdm
 import numpy as np
 import torch
-import torch.multiprocessing as mp
+# import torch.multiprocessing as mp
+
 
 from model import DeepCube
 from env import make_env
@@ -114,8 +118,10 @@ def multi_train(cfg, args):
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
 
-    workers = [Agent(global_deepcube, optimizer, lr_scheduler, global_epoch, valid_history, loss_history, cfg) 
-                    for i in range(num_processes)]
+    # workers = [Agent(global_deepcube, optimizer, lr_scheduler, global_epoch, valid_history, loss_history, cfg) 
+    #                 for i in range(num_processes)]
+    workers = [mp.Process(target=single_train, args=(global_deepcube, optimizer, lr_scheduler, global_epoch, valid_history, loss_history, cfg))
+                        for i in range(num_processes)]
     [w.start() for w in workers]
     [w.join() for w in workers]
 
@@ -213,6 +219,67 @@ class Agent(mp.Process):
                 save_model(self.deepcube, self.local_epoch, self.optimizer, self.lr_scheduler, self.model_path)
                 plot_progress(self.loss_history, save_file_path=self.progress_path)
             self.lr_scheduler.step()
+
+def single_train(global_deepcube, optimizer, lr_scheduler, global_epoch, valid_history, loss_history, cfg):
+    device = torch.device('cpu')
+    print(mp.current_process().pid)
+    cfg = cfg
+    batch_size = cfg['train']['batch_size']
+    sample_size = cfg['train']['sample_size']
+    epochs = cfg['train']['epochs']
+    sample_epoch = cfg['train']['sample_epoch']
+    sample_scramble_count = cfg['train']['sample_scramble_count']
+    sample_cube_count = cfg['train']['sample_cube_count']
+    buffer_size = cfg['train']['buffer_size']
+    temperature = cfg['train']['temperature']
+    validation_epoch = cfg['train']['validation_epoch']
+    video_path = cfg['train']['video_path']
+    model_path = cfg['train']['model_path']
+    progress_path = cfg['train']['progress_path']
+    cube_size = cfg['env']['cube_size']
+    state_dim, action_dim = get_env_config(cube_size)
+    hidden_dim = cfg['model']['hidden_dim']
+
+
+    deepcube = DeepCube(state_dim, action_dim, hidden_dim).to(device)
+    deepcube.load_state_dict(global_deepcube.state_dict())
+    env = make_env(None, cube_size)
+    global_epoch = global_epoch
+    local_epoch = 0
+
+    optimizer = optimizer
+    criterion_list = loss_func()
+    lr_scheduler = lr_scheduler
+
+    replay_buffer = ReplayBuffer(buffer_size, sample_size)
+    valid_history = valid_history
+    loss_history = loss_history
+
+    a = time.time()
+    while global_epoch.value <= (epochs+1):
+        with global_epoch.get_lock():
+            global_epoch.value += 1
+            local_epoch = global_epoch.value
+            print(local_epoch)
+        b = time.time()
+        if (local_epoch-1) % sample_epoch == 0:
+            print(b)
+            env.get_random_samples(replay_buffer, deepcube, sample_scramble_count, sample_cube_count, temperature)
+            c = time.time()
+            print('sampling', c - b)
+            b = c
+        # loss = update_params(deepcube, global_deepcube, replay_buffer, criterion_list, optimizer, batch_size, device, temperature)
+        c = time.time()
+        print('update', c - b)
+        b = c
+        loss_history[local_epoch] = {'loss':[loss]}
+        if local_epoch % validation_epoch == 0:
+            print(f'Current epochs: {local_epoch}, {time.time() - a}')
+            validation(deepcube, env, valid_history, local_epoch, device, cfg)
+            plot_valid_hist(valid_history, save_file_path=progress_path, validation_epoch=validation_epoch)
+            save_model(deepcube, local_epoch, optimizer, lr_scheduler, model_path)
+            plot_progress(loss_history, save_file_path=progress_path)
+        lr_scheduler.step()
             
 
 if __name__ == "__main__":
