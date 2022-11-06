@@ -5,7 +5,7 @@ train:
   epochs: 10
   sample_epoch: 1
   sample_scramble_count: 3
-  sample_cube_count: 100
+  sample_cube_count: 10
   buffer_size: 50000
   temperature: 0.3
   validation_epoch: 10

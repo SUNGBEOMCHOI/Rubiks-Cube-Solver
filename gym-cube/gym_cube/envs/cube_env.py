@@ -42,6 +42,8 @@ class CubeEnv(gym.Env):
             raise NotImplementedError
         if self.show_cube:
             self.render_cube = RenderCube(self.cube_size)
+            # env 전달하기
+            self.render_cube.env = self
             self.fig = self.render_cube.draw_interactive()        
 
     def reset(self, seed = None, scramble_count = 2):

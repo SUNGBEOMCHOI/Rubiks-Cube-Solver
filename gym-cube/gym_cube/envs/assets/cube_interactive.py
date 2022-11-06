@@ -6,6 +6,7 @@
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__)))
+sys.path.append('/home/yoosoo/Desktop/YAI/Code/Rubiks-Cube-Solver-1')
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,8 +15,11 @@ from projection import Quaternion, project_points
 
 import torch
 import gym
-# from model import DeepCube
-# from utils import get_env_config
+
+from cube_utils import isSolved_
+from model import DeepCube
+from env import make_env
+
 
 """
 Sticker representation
@@ -103,6 +107,9 @@ class Cube:
             self.face_colors = self.default_face_colors
         else:
             self.face_colors = face_colors
+
+        # env 받아오기
+        self.env = None
 
         self._move_list = []
         self._initialize_arrays()
@@ -299,17 +306,7 @@ class InteractiveCube(plt.Axes):
                          "(hold shift for counter-clockwise)",
                          size=10)
 
-        ############################################
-        # state_dim, action_dim = get_env_config(self.cube.N)
-        # self.model = DeepCube(state_dim, action_dim)
-        # self.model.load_state_dict(torch.load(PATH))
-        # self.env = gym.make('cube-v0')
-        ############################################
-
     def _initialize_widgets(self):
-        # self._ax_reset = self.figure.add_axes([0.55, 0.05, 0.2, 0.075])
-        # self._btn_reset = widgets.Button(self._ax_reset, 'Reset View')
-        # self._btn_reset.on_clicked(self._reset_view)
         ###############################
         # randomize cube 
         ###############################
@@ -372,8 +369,8 @@ class InteractiveCube(plt.Axes):
         self.figure.canvas.draw()
         data = np.frombuffer(self.figure.canvas.tostring_rgb(), dtype=np.uint8)
         try:
-            # data = data.reshape((1000, 1000, 3))
-            data = data.reshape((800, 800, 3))
+            data = data.reshape((1000, 1000, 3))
+            # data = data.reshape((800, 800, 3))
             self.frames.append(data)
         except:
             pass
@@ -394,7 +391,6 @@ class InteractiveCube(plt.Axes):
         self._current_rot = self._start_rot
         self._draw_cube()
 
-    ####################################################
     def _random_view(self, *args):
         self.set_xlim(self._start_xlim)
         self.set_ylim(self._start_ylim)
@@ -405,28 +401,32 @@ class InteractiveCube(plt.Axes):
             layer = np.random.randint(3)
             self.rotate_face(face, 1, layer, 1)
 
+    ####################################################
     def _my_solve_cube(self, *args):
         '''
-        when the button is clicked, solve cube using trained model
+        get env
+        from env get state
+        get action from model
+        action to simulation action
+        rotate_face
+        state <- new state
         '''
-
-        # self._project(self.cube._stickers)[:,:,2]
-        # move_list = self.cube._move_list[:]
-        # for timestep in range(len(move_list)):
-        #     with torch.no_grad():
-        #         action = self.model.get_action(state)
-        #     next_state, reward, done, info = self.env.step(action)
-        #     # self.cube.rotate_face(face. degree, layer)
-        #     # next_state = [self.cube._face_centroids, self.cube._faces, self.cube._sticker_centroids, self.cube._stickers]
-        #     if done:
-        #         break
-        #     state = next_state
-
-
-        move_list = self.cube._move_list[:]
-        for (face, n, layer) in move_list[::-1]:
-            self.rotate_face(face, -n, layer, steps=3)
-        self.cube._move_list = []
+        action_to_sim_action = {'render':[["U",1],["U",-1],["F",1],["F",-1],["R",1],["R",-1],["D",1],["D",-1],["B",1],["B",-1],["L",1],["L",-1]]}
+        env = self.cube.env
+        device = env.device
+        state = env.sim_cube
+        hidden_dim = [256, 64 ,32]
+        model = DeepCube(env.state_dim, env.action_dim, hidden_dim).to(device)
+        print(env.sim_cube)
+        while not isSolved_(state):
+            state = env.cube
+            with torch.no_grad():
+                state_tensor = torch.tensor(state).float().to(device).detach()
+                action = model.get_action(state_tensor)
+            n, r, d, i = env.step(action)
+            face, degree = action_to_sim_action['render'][action]
+            self.rotate_face(face, degree, layer = 0)
+            state = env.sim_cube
     ####################################################
 
     def _solve_cube(self, *args):
@@ -534,19 +534,19 @@ if __name__ == '__main__':
     except:
         N = 3
 
-    # c = Cube(2)
+    c = Cube(3)
 
 #     do a 3-corner swap
-#     c.rotate_face('R')
-#     c.rotate_face('D')
-#     c.rotate_face('R', -1)
-#     c.rotate_face('U', -1)
-#     c.rotate_face('R')
-#     c.rotate_face('D', -1)
-#     c.rotate_face('R', -1)
-#     c.rotate_face('U')
+    c.rotate_face('R')
+    c.rotate_face('D')
+    c.rotate_face('R', -1)
+    c.rotate_face('U', -1)
+    c.rotate_face('R')
+    c.rotate_face('D', -1)
+    c.rotate_face('R', -1)
+    c.rotate_face('U')
 
-    # fig = c.draw_interactive()
-    # fig.axes[3].rotate_face('R')
+    fig = c.draw_interactive()
+    fig.axes[3].rotate_face('R')
 
-    # plt.show()
+    plt.show()
