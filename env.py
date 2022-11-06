@@ -256,19 +256,18 @@ class Cube(gym.Env):
         # print('sim_to', sim_to)
         # print('solve', solve)
         # print('tar', time.time() - b)
-        
         if reward != 1.0:
             next_state_tensor = torch.tensor(np.array(next_state_list), device=self.device).float() # action_dim, state_dim[0], state_dim[1]
             reward_tensor = torch.tensor(reward_list, device = self.device) # action_dim
             with torch.no_grad():
                 next_value, _ = model(next_state_tensor)
                 value = next_value.squeeze(dim=-1).detach() + reward_tensor
-        #     target_value, target_policy = torch.max(value, -1, keepdim=True)
-        #     target_value, target_policy = target_value.item(), target_policy.item()
-        # with torch.no_grad():
-        #     state_tensor = torch.tensor(self.cube, device=self.device).float()
-        #     value, _ = model(state_tensor.detach())
-        #     error = abs(value.detach().item() - target_value)
+            target_value, target_policy = torch.max(value, -1, keepdim=True)
+            target_value, target_policy = target_value.item(), target_policy.item()
+        with torch.no_grad():
+            state_tensor = torch.tensor(self.cube, device=self.device).float()
+            value, _ = model(state_tensor.detach())
+            error = abs(value.detach().item() - target_value)
         target_value, target_policy, error = 0.0, 0.0, 0.0
         
         return target_value, target_policy, error

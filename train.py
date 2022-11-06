@@ -63,7 +63,7 @@ def train(cfg, args):
     os.makedirs(progress_path, exist_ok=True)
 
     if args.resume:
-        checkpoint = torch.load(args.path)
+        checkpoint = torch.load(args.resume)
         start_epoch = checkpoint['epoch']+1
         deepcube.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -85,7 +85,8 @@ def train(cfg, args):
         lr_scheduler.step()
 
 def multi_train(cfg, args):
-    device = torch.device('cuda' if cfg['device']=='cuda' and torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cuda' if cfg['device']=='cuda' and torch.cuda.is_available() else 'cpu')
+    device = torch.device('cpu:0')
     learning_rate = cfg['train']['learning_rate']
     num_processes = cfg['train']['num_processes']
     video_path = cfg['train']['video_path']
@@ -95,7 +96,8 @@ def multi_train(cfg, args):
     state_dim, action_dim = get_env_config(cube_size)
     hidden_dim = cfg['model']['hidden_dim']
 
-    global_deepcube = DeepCube(state_dim, action_dim, hidden_dim).to(device).share_memory()
+    global_deepcube = DeepCube(state_dim, action_dim, hidden_dim).to(device)
+    global_deepcube.share_memory()
     global_epoch = mp.Value('i', 0)
 
     optimizer = optim_func(global_deepcube, learning_rate)
@@ -120,7 +122,7 @@ def multi_train(cfg, args):
 
     # workers = [Agent(global_deepcube, optimizer, lr_scheduler, global_epoch, valid_history, loss_history, cfg) 
     #                 for i in range(num_processes)]
-    workers = [mp.Process(target=single_train, args=(global_deepcube, optimizer, lr_scheduler, global_epoch, valid_history, loss_history, cfg))
+    workers = [mp.Process(target=single_train, args=(i+1, global_deepcube, optimizer, lr_scheduler, global_epoch, valid_history, loss_history, cfg))
                         for i in range(num_processes)]
     [w.start() for w in workers]
     [w.join() for w in workers]
@@ -220,8 +222,9 @@ class Agent(mp.Process):
                 plot_progress(self.loss_history, save_file_path=self.progress_path)
             self.lr_scheduler.step()
 
-def single_train(global_deepcube, optimizer, lr_scheduler, global_epoch, valid_history, loss_history, cfg):
-    device = torch.device('cpu')
+def single_train(ctx, global_deepcube, optimizer, lr_scheduler, global_epoch, valid_history, loss_history, cfg):
+    device = torch.device(f'cpu:{ctx}')
+    torch.set_num_threads(8)
     print(mp.current_process().pid)
     cfg = cfg
     batch_size = cfg['train']['batch_size']
@@ -243,7 +246,7 @@ def single_train(global_deepcube, optimizer, lr_scheduler, global_epoch, valid_h
 
     deepcube = DeepCube(state_dim, action_dim, hidden_dim).to(device)
     deepcube.load_state_dict(global_deepcube.state_dict())
-    env = make_env(None, cube_size)
+    env = make_env(device, cube_size)
     global_epoch = global_epoch
     local_epoch = 0
 
@@ -286,7 +289,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--resume', type=str, default='', help='Path to pretrained model file')
     args = parser.parse_args()
-
     with open('./config/config.yaml') as f:
         cfg = yaml.safe_load(f)
     import time

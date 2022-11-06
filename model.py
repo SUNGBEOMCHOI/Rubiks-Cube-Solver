@@ -9,6 +9,7 @@ class DeepCube(nn.Module):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.hidden_dim = hidden_dim
+        self.device = torch.device('cpu')
         self.encoder_net = nn.Sequential(
             nn.Flatten(),
             nn.Linear(self.state_dim[0]*self.state_dim[1],  self.hidden_dim[0]),
@@ -26,7 +27,6 @@ class DeepCube(nn.Module):
             nn.ELU(),
             nn.Linear(self.hidden_dim[2], 1)
         )
-        self.count = 0
 
     def forward(self, x):
         """
