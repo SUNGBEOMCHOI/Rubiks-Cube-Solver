@@ -122,10 +122,20 @@ def multi_train(cfg, args):
 
     # workers = [Agent(global_deepcube, optimizer, lr_scheduler, global_epoch, valid_history, loss_history, cfg) 
     #                 for i in range(num_processes)]
-    workers = [mp.Process(target=single_train, args=(i+1, global_deepcube, optimizer, lr_scheduler, global_epoch, valid_history, loss_history, cfg))
-                        for i in range(num_processes)]
-    [w.start() for w in workers]
+    total_epochs = cfg['train']['epochs']
+    
+
+###############################CHANGED##############################
+    workers_list = [total_epochs // num_processes for _ in range(num_processes)]
+    for i in range(total_epochs % num_processes):
+        workers_list[i] += 1
+    workers = []
+    for i in range(num_processes):
+        tmp = mp.Process(target=single_train, args=(i, workers_list[i], global_deepcube, optimizer, lr_scheduler, valid_history, loss_history, cfg))
+        workers.append(tmp)
+        tmp.start()
     [w.join() for w in workers]
+####################################################################
 
 
 def validation(model, env, valid_history, epoch, device, cfg):
@@ -222,9 +232,13 @@ class Agent(mp.Process):
                 plot_progress(self.loss_history, save_file_path=self.progress_path)
             self.lr_scheduler.step()
 
-def single_train(ctx, global_deepcube, optimizer, lr_scheduler, global_epoch, valid_history, loss_history, cfg):
+###############################CHANGED##############################
+def single_train(ctx, local_epoch_max, global_deepcube, optimizer, lr_scheduler, valid_history, loss_history, cfg):
+    
     device = torch.device(f'cpu:{ctx}')
-    torch.set_num_threads(8)
+    # device = torch.device(f'cpu')
+    torch.set_num_threads(1)
+####################################################################
     print(mp.current_process().pid)
     cfg = cfg
     batch_size = cfg['train']['batch_size']
@@ -243,11 +257,11 @@ def single_train(ctx, global_deepcube, optimizer, lr_scheduler, global_epoch, va
     state_dim, action_dim = get_env_config(cube_size)
     hidden_dim = cfg['model']['hidden_dim']
 
-
+    global_deepcube = global_deepcube
     deepcube = DeepCube(state_dim, action_dim, hidden_dim).to(device)
     deepcube.load_state_dict(global_deepcube.state_dict())
     env = make_env(device, cube_size)
-    global_epoch = global_epoch
+    # global_epoch = global_epoch
     local_epoch = 0
 
     optimizer = optimizer
@@ -259,11 +273,11 @@ def single_train(ctx, global_deepcube, optimizer, lr_scheduler, global_epoch, va
     loss_history = loss_history
 
     a = time.time()
-    while global_epoch.value <= (epochs+1):
-        with global_epoch.get_lock():
-            global_epoch.value += 1
-            local_epoch = global_epoch.value
-            print(local_epoch)
+    ###############################CHANGED##############################
+    while local_epoch < local_epoch_max:
+        local_epoch += 1
+        print(local_epoch, f"/ {local_epoch_max}")
+    ####################################################################
         b = time.time()
         if (local_epoch-1) % sample_epoch == 0:
             print(b)
@@ -275,7 +289,7 @@ def single_train(ctx, global_deepcube, optimizer, lr_scheduler, global_epoch, va
         c = time.time()
         print('update', c - b)
         b = c
-        loss_history[local_epoch] = {'loss':[loss]}
+        # loss_history[local_epoch] = {'loss':[loss]}
         if local_epoch % validation_epoch == 0:
             print(f'Current epochs: {local_epoch}, {time.time() - a}')
             validation(deepcube, env, valid_history, local_epoch, device, cfg)
@@ -294,5 +308,6 @@ if __name__ == "__main__":
     import time
     a = time.time()
     # train(cfg, args)
-    # print(time.time()-a)
+    # 
     multi_train(cfg, args)
+    print(time.time()-a)
