@@ -30,10 +30,11 @@ class Cube(gym.Env):
         Gym environment for cube
 
         Args:
+            device: Torch device for training, eg.torch.device('cpu:0')
             cube_size: Cube size you want to make environment
         """
         super().__init__()
-        self.transaction = namedtuple('Sample', ['state', 'target_value', 'target_policy', 'scramble_count', 'error'])
+        # self.transaction = namedtuple('Sample', ['state', 'target_value', 'target_policy', 'scramble_count', 'error'])
         self.cube_size = cube_size
         self.device = device
         self.action_to_sim_action = {\
@@ -143,7 +144,7 @@ class Cube(gym.Env):
         """
         pass
 
-    def get_random_samples(self, replay_buffer, model, sample_scramble_count, sample_cube_count, temperature):
+    def get_random_samples(self, replay_buffer, model, sample_scramble_count, sample_cube_count):
         """
         Add samples to replay buffer which contain (state, target value, target policy, scramble count, error)  for training
         
@@ -152,15 +153,15 @@ class Cube(gym.Env):
             model: Current deep cube model
             sample_scramble_count: Number of scramble cubes randomly
             sample_cube_count: Number of cube samples
-
         """
         for sample_cube_idx in range(1, sample_cube_count+1):
             self.init_state()
             action_sequence = np.random.randint(self.action_dim, size=sample_scramble_count)
             for scramble_idx, action in enumerate(action_sequence):
                 state, _, _, _ = self.step(action)
-                target_value, target_policy, error = self.get_target_value(model, scramble_idx+1, temperature)
-                sample = self.transaction(state, target_value, target_policy, scramble_idx+1, error)
+                target_value, target_policy, error = self.get_target_value(model, scramble_idx+1)
+                # sample = self.transaction(state, target_value, target_policy, scramble_idx+1, error)
+                sample = {'state':state, 'target_value':target_value, 'target_policy':target_policy, 'scramble_count':scramble_idx+1, 'error':error}
                 replay_buffer.append(sample)
         
                 
@@ -208,7 +209,7 @@ class Cube(gym.Env):
             raise NotImplementedError
         return sim_state
 
-    def get_target_value(self, model, scramble_count, temperature):
+    def get_target_value(self, model, scramble_count):
         """
         Return target value and target policy
 
@@ -249,7 +250,6 @@ class Cube(gym.Env):
                 value = next_value.squeeze(dim=-1).detach() + reward_tensor
             target_value, target_policy = torch.max(value, -1, keepdim=True)
             target_value, target_policy = target_value.item(), target_policy.item()
-        weight = scramble_count ** (-1*temperature)
         with torch.no_grad():
             state_tensor = torch.tensor(self.cube, device=self.device).float()
             value, _ = model(state_tensor)

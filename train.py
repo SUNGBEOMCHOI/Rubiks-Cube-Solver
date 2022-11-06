@@ -1,11 +1,13 @@
 import os
 import argparse
 from collections import defaultdict
+from multiprocessing.managers import BaseManager, DictProxy
 
 import yaml
 from tqdm import tqdm
 import numpy as np
 import torch
+import torch.multiprocessing as mp
 
 from model import DeepCube
 from env import make_env
@@ -30,6 +32,7 @@ def train(cfg, args):
     buffer_size = cfg['train']['buffer_size']
     temperature = cfg['train']['temperature']
     validation_epoch = cfg['train']['validation_epoch']
+    num_processes = cfg['train']['num_processes']
     video_path = cfg['train']['video_path']
     model_path = cfg['train']['model_path']
     progress_path = cfg['train']['progress_path']
@@ -62,20 +65,87 @@ def train(cfg, args):
         deepcube.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
+
+    if num_processes: # Use multi process
+        deepcube.share_memory() # global model
+        
+        BaseManager.register('defaultdict', defaultdict, DictProxy)
+        mgr = BaseManager()
+        mgr.start()
+        loss_history = mgr.defaultdict(dict)
+        valid_history = mgr.defaultdict(dict)
     
     ############################
     #       train model        #
     ############################
-    for epoch in tqdm(range(start_epoch, epochs+1)):
-        if (epoch-1) % sample_epoch == 0: # replay buffer에 random sample저장
-            env.get_random_samples(replay_buffer, deepcube, sample_scramble_count, sample_cube_count, temperature)
-        loss = update_params(deepcube, replay_buffer, criterion_list, optimizer, batch_size, device, temperature)
-        loss_history[epoch]['loss'].append(loss)
-        if epoch % validation_epoch == 0:
-            validation(deepcube, env, valid_history, epoch, device, cfg)
-            plot_valid_hist(valid_history, save_file_path=progress_path, validation_epoch=validation_epoch)
-            save_model(deepcube, epoch, optimizer, lr_scheduler, model_path)
+    if num_processes: # Use multi process
+        worker_epochs_list = [epochs // num_processes for _ in range(num_processes)]
+        for i in range(epochs % num_processes):
+            worker_epochs_list[i] += 1
+        workers = [mp.Process(target=single_train, args=(worker_idx, worker_epochs_list[worker_idx-1], deepcube, optimizer, lr_scheduler, valid_history, loss_history, cfg)) for worker_idx in range(1, num_processes+1)]
+        [w.start() for w in workers]
+        [w.join() for w in workers]
+
+    else: # 
+        for epoch in tqdm(range(start_epoch, epochs+1)):
+            if (epoch-1) % sample_epoch == 0: # replay buffer에 random sample저장
+                env.get_random_samples(replay_buffer, deepcube, sample_scramble_count, sample_cube_count)
+            loss = update_params(deepcube, replay_buffer, criterion_list, optimizer, batch_size, device, temperature)
+            loss_history[epoch]['loss'].append(loss)
+            if epoch % validation_epoch == 0:
+                validation(deepcube, env, valid_history, epoch, device, cfg)
+                plot_valid_hist(valid_history, save_file_path=progress_path, validation_epoch=validation_epoch)
+                save_model(deepcube, epoch, optimizer, lr_scheduler, model_path)
+                plot_progress(loss_history, save_file_path=progress_path)
+            lr_scheduler.step()
+
+def single_train(worker_idx, local_epoch_max, global_deepcube, optimizer, lr_scheduler, valid_history, loss_history, cfg):
+    device = torch.device(f'cpu:{worker_idx}')
+    torch.set_num_threads(1)
+    batch_size = cfg['train']['batch_size']
+    sample_size = cfg['train']['sample_size']
+    epochs = cfg['train']['epochs']
+    sample_epoch = cfg['train']['sample_epoch']
+    sample_scramble_count = cfg['train']['sample_scramble_count']
+    sample_cube_count = cfg['train']['sample_cube_count']
+    buffer_size = cfg['train']['buffer_size']
+    temperature = cfg['train']['temperature']
+    validation_epoch = cfg['train']['validation_epoch']
+    num_processes = cfg['train']['num_processes']
+    video_path = cfg['train']['video_path']
+    model_path = cfg['train']['model_path']
+    progress_path = cfg['train']['progress_path']
+    cube_size = cfg['env']['cube_size']
+    state_dim, action_dim = get_env_config(cube_size)
+    hidden_dim = cfg['model']['hidden_dim']
+
+    global_deepcube = global_deepcube
+    deepcube = DeepCube(state_dim, action_dim, hidden_dim).to(device)
+    deepcube.load_state_dict(global_deepcube.state_dict())
+    env = make_env(device, cube_size)
+    local_epoch = 0
+
+    optimizer = optimizer
+    criterion_list = loss_func()
+    lr_scheduler = lr_scheduler
+
+    replay_buffer = ReplayBuffer(buffer_size, sample_size)
+    valid_history = valid_history
+    loss_history = loss_history
+
+    while local_epoch < local_epoch_max:
+        global_epoch = num_processes * local_epoch + worker_idx
+        local_epoch += 1
+        print(f"Train progress : {global_epoch} / {epochs}")
+        if (local_epoch-1) % sample_epoch == 0:
+            env.get_random_samples(replay_buffer, deepcube, sample_scramble_count, sample_cube_count)
+        loss = update_params(deepcube, replay_buffer, criterion_list, optimizer, batch_size, device, temperature, global_deepcube)
+        loss_history[global_epoch] = {'loss':[loss]}
+        if global_epoch % validation_epoch == 0:
             plot_progress(loss_history, save_file_path=progress_path)
+            validation(deepcube, env, valid_history, global_epoch, device, cfg)
+            plot_valid_hist(valid_history, save_file_path=progress_path, validation_epoch=validation_epoch)
+            save_model(global_deepcube, global_epoch, optimizer, lr_scheduler, model_path)
         lr_scheduler.step()
 
 def validation(model, env, valid_history, epoch, device, cfg):
@@ -92,6 +162,7 @@ def validation(model, env, valid_history, epoch, device, cfg):
     sample_scramble_count = cfg['validation']['sample_scramble_count']
     sample_cube_count = cfg['validation']['sample_cube_count']
     seed = [i*10 for i in range(sample_cube_count)]
+    solve_percentage_list = []
     # TODO: 비디오 저장이 가능하도록
     for scramble_count in range(1, sample_scramble_count+1):
         solve_count = 0
@@ -113,7 +184,9 @@ def validation(model, env, valid_history, epoch, device, cfg):
                 # env.close_render()
                 pass
         solve_percentage = (solve_count/sample_cube_count) * 100
-        valid_history[epoch]['solve_percentage'].append(solve_percentage)
+        solve_percentage_list.append(solve_percentage)
+        # valid_history[epoch]['solve_percentage'].append(solve_percentage)
+    valid_history[epoch] = {'solve_percentage':solve_percentage_list}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

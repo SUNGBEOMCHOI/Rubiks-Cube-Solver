@@ -137,10 +137,8 @@ class ReplayBuffer(Dataset):
         self.buf_size = buf_size
         self.sample_size = sample_size
         self.memory = deque(maxlen=self.buf_size)
-        # self.prob_memory = deque(maxlen=self.buf_size) # Deque of saving sampling probability
         self.error_memory = deque(maxlen=self.buf_size) # Deque of saving error
         # error means difference between target value and predicted value
-        # self.sum_error = 0.0 # sum of total error
         self.prioritized_idx = None
 
     def __len__(self):
@@ -163,10 +161,14 @@ class ReplayBuffer(Dataset):
             scramble_count_tensor: Torch tensor of scamble count of shape [1]
         """
         memory_idx = self.prioritized_idx[idx]
-        state_tensor = torch.tensor(self.memory[memory_idx].state)
-        target_value_tensor = torch.tensor(self.memory[memory_idx].target_value)
-        target_policy_tensor = torch.tensor(self.memory[memory_idx].target_policy)
-        scramble_count_tensor = torch.tensor(self.memory[memory_idx].scramble_count)
+        # state_tensor = torch.tensor(self.memory[memory_idx].state)
+        # target_value_tensor = torch.tensor(self.memory[memory_idx].target_value)
+        # target_policy_tensor = torch.tensor(self.memory[memory_idx].target_policy)
+        # scramble_count_tensor = torch.tensor(self.memory[memory_idx].scramble_count)
+        state_tensor = torch.tensor(self.memory[memory_idx]['state'])
+        target_value_tensor = torch.tensor(self.memory[memory_idx]['target_value'])
+        target_policy_tensor = torch.tensor(self.memory[memory_idx]['target_policy'])
+        scramble_count_tensor = torch.tensor(self.memory[memory_idx]['scramble_count'])
         idx_tensor = torch.tensor(memory_idx)
         return state_tensor, target_value_tensor, target_policy_tensor, scramble_count_tensor, idx_tensor
         
@@ -185,7 +187,8 @@ class ReplayBuffer(Dataset):
             x: Input
         """
         self.memory.append(x)
-        self.error_memory.append(x.error)
+        # self.error_memory.append(x.error)
+        self.error_memory.append(x['error'])
 
     def update(self, idx, error):
         """
@@ -198,7 +201,7 @@ class ReplayBuffer(Dataset):
         self.error_memory[idx] = error
 
         
-def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, device, temperature=0.3):
+def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, device, temperature, global_model=None):
     """
     Update model networks' parameters with replay buffer
     
@@ -211,6 +214,7 @@ def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, d
         device
         temperature: Constant of scramble count weight
                      0 -> all scramble count has same weight, Large temperature has large difference weight
+        global_model: Gloabal model for using multi processing
     Returns:
         total_loss: sum of value loss and policy loss
     """
@@ -229,7 +233,6 @@ def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, d
         
         predicted_value, predicted_policy = model(state.float().detach())
         predicted_value, predicted_policy = predicted_value.squeeze(dim=-1), predicted_policy.squeeze(dim=-1)
-        optimizer.zero_grad()
         # calculate value loss
         loss = value_criterion(predicted_value, target_value.detach()).squeeze(dim=-1)
                         
@@ -241,8 +244,19 @@ def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, d
         policy_loss = (policy_criterion(predicted_policy, target_policy.detach()) * \
                         reciprocal_scramble_count.squeeze(dim=-1).detach()).mean()
         loss = value_loss + policy_loss
-        loss.backward()
-        optimizer.step()
+        
+        
+        if global_model:
+            loss.backward()
+            optimizer.zero_grad()
+            for local_param, global_param in zip(model.parameters(), global_model.parameters()):
+                global_param._grad = local_param.grad
+            optimizer.step()
+            model.load_state_dict(global_model.state_dict())
+        else:
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
         total_loss = total_loss + loss.item()
     total_loss/= num_samples
