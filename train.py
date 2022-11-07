@@ -90,7 +90,7 @@ def train(cfg, args):
         [w.start() for w in workers]
         [w.join() for w in workers]
 
-    else:
+    else: # if num_processes == 0, then train with single machine
         for epoch in tqdm(range(start_epoch, epochs+1)):
             if (epoch-1) % sample_epoch == 0: # replay buffer에 random sample저장
                 env.get_random_samples(replay_buffer, deepcube, sample_scramble_count, sample_cube_count)
@@ -104,6 +104,19 @@ def train(cfg, args):
             lr_scheduler.step()
 
 def single_train(worker_idx, local_epoch_max, global_deepcube, optimizer, lr_scheduler, valid_history, loss_history, cfg):
+    """
+    Function for train on single process
+
+    Args:
+        worker_idx: Process index
+        local_epoch_max: Train epoch on single process
+        global_deepcube: Shared global train model
+        optimizer: Torch optimizer for global deepcube parameters
+        lr_scheduler: Leaning rate scheduler (Not available now)
+        valid_history: Dictionary for saving validation result
+        loss_history: Dictionary for saving loss history
+        cfg: config data from yaml file    
+    """
     device = torch.device(f'cpu:{worker_idx}')
     torch.set_num_threads(1)
     batch_size = cfg['train']['batch_size']
@@ -138,7 +151,6 @@ def single_train(worker_idx, local_epoch_max, global_deepcube, optimizer, lr_sch
     loss_history = loss_history
 
     while local_epoch < local_epoch_max:
-        # global_epoch = num_processes * local_epoch + worker_idx
         local_epoch += 1
         if (local_epoch-1) % sample_epoch == 0:
             env.get_random_samples(replay_buffer, deepcube, sample_scramble_count, sample_cube_count)
@@ -152,7 +164,7 @@ def single_train(worker_idx, local_epoch_max, global_deepcube, optimizer, lr_sch
             validation(global_deepcube, env, valid_history, global_epoch, device, cfg)
             plot_valid_hist(valid_history, save_file_path=progress_path, validation_epoch=validation_epoch)
             save_model(global_deepcube, global_epoch, optimizer, lr_scheduler, model_path)
-        # lr_scheduler.step()
+        # lr_scheduler.step() # You can run this line for using learning rate scheduler
 
 def validation(model, env, valid_history, epoch, device, cfg):
     """

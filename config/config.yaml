@@ -35,5 +35,5 @@ test:
   save_file_path: './test'
   max_timesteps: 200
   show_scramble_count: 100
-  masks: 'x' # ['x', 'both', 'only']
+  masks: 'both' # ['x', 'both', 'only']
   mcts_: 'x' # ['x', 'both', 'only']

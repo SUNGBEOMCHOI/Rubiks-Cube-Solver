@@ -1,3 +1,4 @@
+import math
 from collections import deque, Counter
 
 import numpy as np
@@ -216,6 +217,7 @@ def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, d
         temperature: Constant of scramble count weight
                      0 -> all scramble count has same weight, Large temperature has large difference weight
         global_model: Gloabal model for using multi processing
+        
     Returns:
         total_loss: sum of value loss and policy loss
     """
@@ -263,15 +265,16 @@ def update_params(model, replay_buffer, criterion_list, optimizer, batch_size, d
     total_loss/= num_samples
     return total_loss
 
-
-import math
-
-import torch
-import torch.optim as optim
-
-
 class SharedAdam(optim.Adam):
-    """Implements Adam algorithm with shared states.
+    """
+    Implements Adam algorithm with shared states.
+
+    Args:
+        params: Torch model parameters you want to train
+        lr: learning rate
+        betas: Coefficients used for computing running averages of gradient and its square
+        eps: Term added to the denominator to improve numerical stability
+        weight_decay: Weight decay (L2 penalty)
     """
 
     def __init__(self,
