@@ -6,10 +6,10 @@ train:
   sample_epoch: 1
   sample_scramble_count: 30
   sample_cube_count: 100
-  buffer_size: 50000
-  temperature: 0.3
+  buffer_size: 20000
+  temperature: 1.0
   validation_epoch: 1400
-  num_processes: 4
+  num_processes: 14
   video_path: ./video
   model_path: ./pretrained
   progress_path: ./train_progress
@@ -18,16 +18,17 @@ validation:
   sample_scramble_count: 30
   sample_cube_count: 10
 env:
-  cube_size: 3
+  cube_size: 2
 model:
   hidden_dim:
-    - 1024
-    - 256
+    - 512
     - 128
+    - 64
 device: cpu
 mcts:
-  numMCTSSim: 10
+  numMCTSSim: 50
   cpuct: 1.0
+  virtual_loss_const: 150
 test:
   cube_size: 2
   test_model_path: './test/model'

@@ -157,7 +157,7 @@ def single_train(worker_idx, local_epoch_max, global_deepcube, optimizer, lr_sch
     while local_epoch < local_epoch_max:
         local_epoch += 1
         if (local_epoch-1) % sample_epoch == 0:
-            env.get_random_samples(replay_buffer, deepcube, sample_scramble_count, sample_cube_count)
+            env.get_random_samples(replay_buffer, global_deepcube, sample_scramble_count, sample_cube_count)
         deepcube.load_state_dict(global_deepcube.state_dict())
         loss = update_params(deepcube, replay_buffer, criterion_list, optimizer, batch_size, device, temperature, global_deepcube)
         global_epoch = len(loss_history)+1
@@ -165,7 +165,7 @@ def single_train(worker_idx, local_epoch_max, global_deepcube, optimizer, lr_sch
         print(f"Train progress : {global_epoch} / {epochs} Loss : {loss}")
         if global_epoch % validation_epoch == 0:
             plot_progress(loss_history, save_file_path=progress_path)
-            validation(global_deepcube, env, valid_history, global_epoch, device, cfg)
+            validation(deepcube, env, valid_history, global_epoch, device, cfg)
             plot_valid_hist(valid_history, save_file_path=progress_path, validation_epoch=validation_epoch)
             save_model(global_deepcube, global_epoch, optimizer, lr_scheduler, model_path)
         # lr_scheduler.step() # You can run this line for using learning rate scheduler
