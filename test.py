@@ -189,7 +189,7 @@ def plot_solve_ratio(array, options, colors_list, save_file_path):
     x=range(1, len(array[0,0,:,0])+1)
     for idx, option in enumerate(options):
         y=[array[2, idx, x-1, :,].mean()*100 for x in range(1, len(array[0,0,:,0])+1)]
-        ax.plot(x, y, '--', label = f"{'MCTS'*option[2]}{'Mask'*option[1]}{option[0][:-14]}", color = colors_list[idx])
+        ax.plot(x, y, '--', label = f"{'MCTS'*option[2]}{'Mask'*option[1]}{option[0][:]}", color = colors_list[idx])
     ax.legend(loc = 'upper right')
     ax.set_xticks(np.linspace(1, len(array[0,0,:,0])+1, 7, endpoint = True))
     ax.set_yticks(np.linspace(0, 100, 6, endpoint = True))

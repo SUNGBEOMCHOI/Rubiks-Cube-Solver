@@ -1,4 +1,5 @@
 import os
+import time
 import argparse
 from collections import defaultdict
 from multiprocessing.managers import BaseManager, DictProxy
@@ -86,12 +87,14 @@ def train(cfg, args):
         worker_epochs_list = [epochs // num_processes for _ in range(num_processes)]
         for i in range(epochs % num_processes):
             worker_epochs_list[i] += 1
-        workers = [mp.Process(target=single_train, args=(worker_idx, worker_epochs_list[worker_idx-1], deepcube, optimizer, lr_scheduler, valid_history, loss_history, cfg)) for worker_idx in range(1, num_processes+1)]
+        workers = [mp.Process(target=single_train, args=(worker_idx, worker_epochs_list[worker_idx-1], deepcube, optimizer, lr_scheduler, valid_history, loss_history, cfg))\
+                     for worker_idx in range(1, num_processes+1)]
         [w.start() for w in workers]
         [w.join() for w in workers]
 
     else: # if num_processes == 0, then train with single machine
         for epoch in tqdm(range(start_epoch, epochs+1)):
+            a = time.time()
             if (epoch-1) % sample_epoch == 0: # replay buffer에 random sample저장
                 env.get_random_samples(replay_buffer, deepcube, sample_scramble_count, sample_cube_count)
             loss = update_params(deepcube, replay_buffer, criterion_list, optimizer, batch_size, device, temperature)
@@ -101,7 +104,8 @@ def train(cfg, args):
                 plot_valid_hist(valid_history, save_file_path=progress_path, validation_epoch=validation_epoch)
                 save_model(deepcube, epoch, optimizer, lr_scheduler, model_path)
                 plot_progress(loss_history, save_file_path=progress_path)
-            lr_scheduler.step()
+            print(f'{epoch} : Time {time.time()-a}')
+            # lr_scheduler.step()
 
 def single_train(worker_idx, local_epoch_max, global_deepcube, optimizer, lr_scheduler, valid_history, loss_history, cfg):
     """
@@ -199,6 +203,7 @@ def validation(model, env, valid_history, epoch, device, cfg):
                     break
                 state = next_state
             if idx == sample_cube_count and scramble_count==sample_scramble_count: # 마지막 state render종료
+                # env.save_video(cube_size = env.cube_size, scramble_count = scramble_count, sample_cube_count = sample_cube_count, video_path = video_path)
                 # env.close_render()
                 pass
         solve_percentage = (solve_count/sample_cube_count) * 100

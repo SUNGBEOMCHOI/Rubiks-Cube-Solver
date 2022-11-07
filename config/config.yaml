@@ -2,14 +2,14 @@ train:
   batch_size: 512
   sample_size: 10000
   learning_rate: 0.00005
-  epochs: 10000
+  epochs: 140000
   sample_epoch: 1
   sample_scramble_count: 30
   sample_cube_count: 100
   buffer_size: 50000
   temperature: 0.3
-  validation_epoch: 100
-  num_processes: 14
+  validation_epoch: 1400
+  num_processes: 4
   video_path: ./video
   model_path: ./pretrained
   progress_path: ./train_progress
@@ -18,17 +18,16 @@ validation:
   sample_scramble_count: 30
   sample_cube_count: 10
 env:
-  cube_size: 2
+  cube_size: 3
 model:
   hidden_dim:
+    - 1024
     - 256
-    - 64
-    - 32
+    - 128
 device: cpu
 mcts:
   numMCTSSim: 10
   cpuct: 1.0
-  virtual_loss_const: 150
 test:
   cube_size: 2
   test_model_path: './test/model'
