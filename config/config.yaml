@@ -28,10 +28,12 @@ device: cpu
 mcts:
   numMCTSSim: 10
   cpuct: 1.0
+  virtual_loss_const: 150
 test:
   cube_size: 2
   test_model_path: './test/model'
   save_file_path: './test'
   max_timesteps: 200
   show_scramble_count: 100
-  masks: 'both' #'only' # or 'both'
+  masks: 'x' # ['x', 'both', 'only']
+  mcts_: 'x' # ['x', 'both', 'only']

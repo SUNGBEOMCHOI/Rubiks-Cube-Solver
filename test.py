@@ -41,7 +41,7 @@ def test(cfg, mode = 'show'):
 
     if mode == 'save':
         time1 = time.time()
-        # plot_test_solve_percentage(env, cfg, device) # max 200일 때 750초
+        plot_test_solve_percentage(env, cfg, device) # max 200일 때 750초
         plot_test_distribution_and_dispersion(env, cfg, device) #max 200일 때 600초
         print(time.time()-time1)
         pass
