@@ -192,7 +192,7 @@ def validation(model, env, valid_history, epoch, device, cfg):
             if idx == sample_cube_count and scramble_count==sample_scramble_count: # 마지막 state
                 # env.render()
                 pass
-            state, done = env.reset(seed[idx-1], scramble_count), False
+            state, done = env.reset(seed=seed[idx-1], scramble_count=scramble_count), False
             for timestep in range(1, max_timesteps+1):
                 with torch.no_grad():
                     state_tensor = torch.tensor(state).float().to(device).detach()
@@ -208,7 +208,6 @@ def validation(model, env, valid_history, epoch, device, cfg):
                 pass
         solve_percentage = (solve_count/sample_cube_count) * 100
         solve_percentage_list.append(solve_percentage)
-        # valid_history[epoch]['solve_percentage'].append(solve_percentage)
     valid_history[epoch] = {'solve_percentage':solve_percentage_list}
 
 if __name__ == "__main__":

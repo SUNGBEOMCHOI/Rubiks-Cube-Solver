@@ -124,7 +124,7 @@ def trial(model, env, cfg, scramble_count, seed = None, mask=False, mcts_=False)
     """
     max_timesteps = cfg['test']['max_timesteps']
     solve_scramble_count, solve_time_time, trial_result = 0, 0, 0
-    state, done, pre_action = env.reset(seed, scramble_count), False, None
+    state, done, pre_action = env.reset(seed=seed, scramble_count=scramble_count), False, None
     start_time = time.time()
     if mcts_:
         mcts = MCTS(model, cfg)

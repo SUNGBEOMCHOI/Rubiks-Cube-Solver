@@ -18,19 +18,19 @@ validation:
   sample_scramble_count: 30
   sample_cube_count: 10
 env:
-  cube_size: 2
+  cube_size: 3
 model:
   hidden_dim:
-    - 512
+    - 1024
+    - 256
     - 128
-    - 64
 device: cpu
 mcts:
   numMCTSSim: 50
   cpuct: 1.0
   virtual_loss_const: 150
 test:
-  cube_size: 2
+  cube_size: 3
   test_model_path: './test/model'
   save_file_path: './test'
   max_timesteps: 200
