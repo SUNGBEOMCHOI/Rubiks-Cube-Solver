@@ -19,7 +19,7 @@ import gym
 from cube_utils import isSolved_
 from model import DeepCube
 from env import make_env
-
+from py333 import isSolved_3
 
 """
 Sticker representation
@@ -368,12 +368,16 @@ class InteractiveCube(plt.Axes):
 
         self.figure.canvas.draw()
         data = np.frombuffer(self.figure.canvas.tostring_rgb(), dtype=np.uint8)
-        try:
-            data = data.reshape((1000, 1000, 3))
-            # data = data.reshape((800, 800, 3))
-            self.frames.append(data)
-        except:
-            pass
+        if data.shape[0] == 1920000:
+            data = data.reshape((800, 800, 3))
+        else:
+            try:
+                data = data.reshape((1000, 1000, 3))
+            except:
+                print(data.shape())
+                pass
+        self.frames.append(data)
+
 
     def rotate(self, rot):
         self._current_rot = self._current_rot * rot
@@ -417,8 +421,7 @@ class InteractiveCube(plt.Axes):
         state = env.sim_cube
         hidden_dim = [256, 64 ,32]
         model = DeepCube(env.state_dim, env.action_dim, hidden_dim).to(device)
-        print(env.sim_cube)
-        while not isSolved_(state):
+        while not isSolved_3(state):
             state = env.cube
             with torch.no_grad():
                 state_tensor = torch.tensor(state).float().to(device).detach()
@@ -527,26 +530,26 @@ class InteractiveCube(plt.Axes):
 
                 self.figure.canvas.draw()
 
-if __name__ == '__main__':
-    import sys
-    try:
-        N = int(sys.argv[1])
-    except:
-        N = 3
+# if __name__ == '__main__':
+#     import sys
+#     try:
+#         N = int(sys.argv[1])
+#     except:
+#         N = 3
 
-    c = Cube(3)
+    # c = Cube(3)
 
 #     do a 3-corner swap
-    c.rotate_face('R')
-    c.rotate_face('D')
-    c.rotate_face('R', -1)
-    c.rotate_face('U', -1)
-    c.rotate_face('R')
-    c.rotate_face('D', -1)
-    c.rotate_face('R', -1)
-    c.rotate_face('U')
+    # c.rotate_face('R')
+    # c.rotate_face('D')
+    # c.rotate_face('R', -1)
+    # c.rotate_face('U', -1)
+    # c.rotate_face('R')
+    # c.rotate_face('D', -1)
+    # c.rotate_face('R', -1)
+    # c.rotate_face('U')
 
-    fig = c.draw_interactive()
-    fig.axes[3].rotate_face('R')
+    # fig = c.draw_interactive()
+    # fig.axes[3].rotate_face('R')
 
-    plt.show()
+    # plt.show()

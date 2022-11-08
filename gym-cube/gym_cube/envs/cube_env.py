@@ -31,7 +31,6 @@ class CubeEnv(gym.Env):
         self.show_cube = False
         self.state_dim, self.action_dim = get_env_config(cube_size)
         self.init_state()
-        self.frames = []
     
     def init_state(self):
         if self.cube_size == 2:
@@ -102,13 +101,16 @@ class CubeEnv(gym.Env):
         self.render_cube = RenderCube(self.cube_size)
         self.fig = self.render_cube.draw_interactive()
         self.show_cube=True
+        plt.close()
         return self.fig
     
     def close_render(self):
         self.show_cube = False
+        plt.pause(1)
+        plt.close()
     
     def sim_state_to_state(self, sim_state):
-        start_time = time.time()
+        # start_time = time.time()
         if self.cube_size == 2:
             state = np.zeros(self.state_dim)
             for position, cubelet in enumerate(getOP(sim_state)):
@@ -117,7 +119,7 @@ class CubeEnv(gym.Env):
                 state[state_cubelet][state_position] = 1.0 # one hot
         elif self.cube_size == 3:
             state = pos_to_state_3(getOP_3(sim_state))
-            print("Conversion Time: ", time.time() - start_time)
+            # print("Conversion Time: ", time.time() - start_time)
             # corner_location_list = ["LDB", "LDF", "LUB", "LUF", "RDB", "RDF", "RUB", "RUF"]
             # edge_location_list = ["LB", "LF", "LU", "LD", "DB", "DF", "UB", "UF", "RB", "RF", "RU", "RD"]
             # corner_state = np.zeros([8, 24])
@@ -301,28 +303,21 @@ class CubeEnv(gym.Env):
         weight = scramble_count ** (-1*temperature)
         with torch.no_grad():
             state_tensor = torch.tensor(self.cube, device=self.device).float()
-            start_time = time.time()
+
             value, _ = model(state_tensor)
-            model_time = time.time() - start_time
-            print("Model Time: ", model_time)
             error = abs(value.detach().item() - target_value)
         return target_value, target_policy, error
     
     def save_video(self, cube_size, scramble_count, sample_cube_count, video_path='./video'):
         filename = f'cube{cube_size}_scramble{scramble_count}_sample{sample_cube_count}.gif'
-        self.frames = self.fig.axes[3].frames # interactivecube.frames
-        plt.figure(figsize=(self.frames[0].shape[1] / 72.0, self.frames[0].shape[0] / 72.0), dpi=72)
-        patch = plt.imshow(self.frames[0])
+        frames = self.fig.axes[3].frames # interactivecube.frames
+        plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
+        patch = plt.imshow(frames[0])
         plt.axis('off')
 
         def animate(i):
-            patch.set_data(self.frames[i])
+            patch.set_data(frames[i])
 
-        anim = animation.FuncAnimation(plt.gcf(), animate, frames = len(self.frames), interval=0)
+        anim = animation.FuncAnimation(plt.gcf(), animate, frames = len(frames), interval=1)
         anim.save(video_path + '/'+ filename, writer='imagemagick', fps=5)
-    
-
-
-
-
-    
+        self.close_render()

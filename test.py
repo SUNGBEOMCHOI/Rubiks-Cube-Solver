@@ -45,7 +45,19 @@ def test(cfg, mode = 'show'):
         deepcube.load_state_dict(torch.load(test_model_path + '\\model_7500.pt', map_location = device)['model_state_dict'])
         _, _, trial_result, action_list = trial(deepcube, env, cfg, show_scramble_count, seed=None, mask=True, save=False)
         analysis(action_list, trial_result, mode)
-        # trial 결과 나왔으니 시뮬레이션 띄우기 
+        # trial 결과 나왔으니 시뮬레이션 띄우기
+        env.render()
+        state, done = env.reset(scramble_count = show_scramble_count), False
+        while not done:
+            with torch.no_grad():
+                state_tensor = torch.tensor(state).float().to(device).detach()
+                action = deepcube.get_action(state_tensor)
+            next_state, r, done, i = env.step(action)
+            if done:
+                break
+            state = next_state
+
+
         pass
     else : # show랑 save 둘다 아님
         raise ValueError('You can only choose \"show\" or \"save\" as mode factor')
