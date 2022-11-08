@@ -13,7 +13,9 @@ from assets.py222.py222 import initState, getOP, doMove, isSolved, getStickers, 
 import pycuber as pc
 from utils import *
 from assets.cube_utils import isSolved_
-import copy
+from assets.py333 import initState_3, doMove_3, getOP_3, isSolved_3, pos_to_state_3
+
+import time
 
 class CubeEnv(gym.Env):
     metadata = {'render_modes': ['human', 'rgb_array']}
@@ -36,7 +38,8 @@ class CubeEnv(gym.Env):
             self.sim_cube = initState() # py222
             self.cube = self.sim_state_to_state(self.sim_cube)
         elif self.cube_size == 3:
-            self.sim_cube = pc.Cube()
+            # self.sim_cube = pc.Cube()
+            self.sim_cube = initState_3()
             self.cube = self.sim_state_to_state(self.sim_cube)
         else:
             raise NotImplementedError
@@ -71,14 +74,22 @@ class CubeEnv(gym.Env):
                 reward = -1.0
         elif self.cube_size == 3:
             sim_action = self.action_to_sim_action[self.cube_size][action]
-            # if isSolved_(self.sim_cube):
-            if isSolved_(self.sim_cube.perform_step(sim_action)):
+            self.sim_cube = doMove_3(self.sim_cube, sim_action)
+            self.cube = self.sim_state_to_state(self.sim_cube)
+            if isSolved_3(self.sim_cube):
                 done = True
                 reward = 1.0
             else:
                 done = False
                 reward = -1.0
-            self.cube = self.sim_state_to_state(self.sim_cube)
+            # # if isSolved_(self.sim_cube):
+            # if isSolved_(self.sim_cube.perform_step(sim_action)):
+            #     done = True
+            #     reward = 1.0
+            # else:
+            #     done = False
+            #     reward = -1.0
+            # self.cube = self.sim_state_to_state(self.sim_cube)
         else:
             raise NotImplementedError
         
@@ -97,6 +108,7 @@ class CubeEnv(gym.Env):
         self.show_cube = False
     
     def sim_state_to_state(self, sim_state):
+        start_time = time.time()
         if self.cube_size == 2:
             state = np.zeros(self.state_dim)
             for position, cubelet in enumerate(getOP(sim_state)):
@@ -104,90 +116,92 @@ class CubeEnv(gym.Env):
                 state_position = position * 3 + position_idx
                 state[state_cubelet][state_position] = 1.0 # one hot
         elif self.cube_size == 3:
-            corner_location_list = ["LDB", "LDF", "LUB", "LUF", "RDB", "RDF", "RUB", "RUF"]
-            edge_location_list = ["LB", "LF", "LU", "LD", "DB", "DF", "UB", "UF", "RB", "RF", "RU", "RD"]
-            corner_state = np.zeros([8, 24])
-            edge_state = np.zeros([12, 24])
-            corner_list = []
-            edge_list = []
-            u_list = sim_state.at_face("U") 
-            d_list = sim_state.at_face("D")
-            f_list = sim_state.at_face("F")
-            b_list = sim_state.at_face("B")
+            state = pos_to_state_3(getOP_3(sim_state))
+            print("Conversion Time: ", time.time() - start_time)
+            # corner_location_list = ["LDB", "LDF", "LUB", "LUF", "RDB", "RDF", "RUB", "RUF"]
+            # edge_location_list = ["LB", "LF", "LU", "LD", "DB", "DF", "UB", "UF", "RB", "RF", "RU", "RD"]
+            # corner_state = np.zeros([8, 24])
+            # edge_state = np.zeros([12, 24])
+            # corner_list = []
+            # edge_list = []
+            # u_list = sim_state.at_face("U") 
+            # d_list = sim_state.at_face("D")
+            # f_list = sim_state.at_face("F")
+            # b_list = sim_state.at_face("B")
 
-            for u in u_list:
-                if u.type == 'corner':
-                    corner_list.append(u)
-                elif u.type == 'edge':
-                    edge_list.append(u)
-            for d in d_list:
-                if d.type == 'corner':
-                    corner_list.append(d)
-                elif d.type == 'edge':
-                    edge_list.append(d)
-            for f in f_list:
-                if f.type == 'edge':
-                    if f.location == 'LF' or f.location == 'RF':
-                        edge_list.append(f)
-            for b in b_list:
-                if b.type == 'edge':
-                    if b.location == 'LB' or b.location == 'RB':
-                        edge_list.append(b)
+            # for u in u_list:
+            #     if u.type == 'corner':
+            #         corner_list.append(u)
+            #     elif u.type == 'edge':
+            #         edge_list.append(u)
+            # for d in d_list:
+            #     if d.type == 'corner':
+            #         corner_list.append(d)
+            #     elif d.type == 'edge':
+            #         edge_list.append(d)
+            # for f in f_list:
+            #     if f.type == 'edge':
+            #         if f.location == 'LF' or f.location == 'RF':
+            #             edge_list.append(f)
+            # for b in b_list:
+            #     if b.type == 'edge':
+            #         if b.location == 'LB' or b.location == 'RB':
+            #             edge_list.append(b)
 
-            # 색 조합으로 위치 찾기
-            corner_color_dict = {}
-            for corner in corner_list:
-                corner_color_dict[corner.location] = [corner.facings, corner.facings[corner.location[1]]] # U, D
+            # # 색 조합으로 위치 찾기
+            # corner_color_dict = {}
+            # for corner in corner_list:
+            #     corner_color_dict[corner.location] = [corner.facings, corner.facings[corner.location[1]]] # U, D
 
-            edge_color_dict = {}
-            for edge in edge_list:
-                if edge.location[0] == 'L':
-                    edge_color_dict[edge.location] = [edge.facings, edge.facings[edge.location[1]]] # LU, LD. LF, LB 
-                elif edge.location[0] == 'R':
-                    edge_color_dict[edge.location] = [edge.facings,edge.facings[edge.location[1]]] # RU, RD. RF. RB
-                elif edge.location[0] == 'U':
-                    edge_color_dict[edge.location] = [edge.facings,edge.facings[edge.location[0]]] # UB, UF
-                elif edge.location[0] == 'D':
-                    edge_color_dict[edge.location] = [edge.facings,edge.facings[edge.location[0]]] # DB, DF
-                else:
-                    pass
+            # edge_color_dict = {}
+            # for edge in edge_list:
+            #     if edge.location[0] == 'L':
+            #         edge_color_dict[edge.location] = [edge.facings, edge.facings[edge.location[1]]] # LU, LD. LF, LB 
+            #     elif edge.location[0] == 'R':
+            #         edge_color_dict[edge.location] = [edge.facings,edge.facings[edge.location[1]]] # RU, RD. RF. RB
+            #     elif edge.location[0] == 'U':
+            #         edge_color_dict[edge.location] = [edge.facings,edge.facings[edge.location[0]]] # UB, UF
+            #     elif edge.location[0] == 'D':
+            #         edge_color_dict[edge.location] = [edge.facings,edge.facings[edge.location[0]]] # DB, DF
+            #     else:
+            #         pass
 
-            # corner의 색 조합은 유일 -> 같은 색 조합을 갖는 corner를 찾고 X Y Z 에 따라 3가지 경우의 수가 존재함을 이용
-            base_cube = pc.Cube()
-            for key in corner_color_dict.keys():
-                facings, target_face = corner_color_dict[key][0], corner_color_dict[key][1]
-                facings_set = set()
-                for face_key in facings.keys():
-                    facings_set.add(facings[face_key])
-                for position, corner_location in enumerate(corner_location_list): # 0 ~ 7 corner location
-                    base_color_map = base_cube[corner_location].facings
-                    base_set = set()
-                    for base_key in base_color_map.keys():
-                        base_set.add(base_color_map[base_key])
-                    if facings_set == base_set: # finding same color set: 0 ~ 7, 처음 위치와 현재 위치가 다르다
-                        for position_idx, base_key in enumerate(base_color_map):
-                            base_color = base_color_map[base_key]
-                            if target_face == base_color: # finding target face position idx: 0 ~ 2
-                                state_position = position * 3 + position_idx
-                                corner_state[position][state_position] = 1.0
+            # # corner의 색 조합은 유일 -> 같은 색 조합을 갖는 corner를 찾고 X Y Z 에 따라 3가지 경우의 수가 존재함을 이용
+            # base_cube = pc.Cube()
+            # for key in corner_color_dict.keys():
+            #     facings, target_face = corner_color_dict[key][0], corner_color_dict[key][1]
+            #     facings_set = set()
+            #     for face_key in facings.keys():
+            #         facings_set.add(facings[face_key])
+            #     for position, corner_location in enumerate(corner_location_list): # 0 ~ 7 corner location
+            #         base_color_map = base_cube[corner_location].facings
+            #         base_set = set()
+            #         for base_key in base_color_map.keys():
+            #             base_set.add(base_color_map[base_key])
+            #         if facings_set == base_set: # finding same color set: 0 ~ 7, 처음 위치와 현재 위치가 다르다
+            #             for position_idx, base_key in enumerate(base_color_map):
+            #                 base_color = base_color_map[base_key]
+            #                 if target_face == base_color: # finding target face position idx: 0 ~ 2
+            #                     state_position = position * 3 + position_idx
+            #                     corner_state[position][state_position] = 1.0
 
-            for key in edge_color_dict.keys():
-                facings, target_face = edge_color_dict[key][0], edge_color_dict[key][1]
-                facings_set = set()
-                for face_key in facings.keys():
-                    facings_set.add(facings[face_key])
-                for position, edge_location in enumerate(edge_location_list):
-                    base_color_map = base_cube[edge_location].facings
-                    base_set = set()
-                    for base_key in base_color_map.keys():
-                        base_set.add(base_color_map[base_key])
-                    if facings_set == base_set: # 0 ~ 11
-                        for position_idx, base_key in enumerate(base_color_map):
-                            base_color = base_color_map[base_key]
-                            if target_face == base_color:
-                                state_position = position * 2 + position_idx # 0 ~ 1
-                                edge_state[position][state_position] = 1.0
-            state = np.concatenate([corner_state, edge_state])
+            # for key in edge_color_dict.keys():
+            #     facings, target_face = edge_color_dict[key][0], edge_color_dict[key][1]
+            #     facings_set = set()
+            #     for face_key in facings.keys():
+            #         facings_set.add(facings[face_key])
+            #     for position, edge_location in enumerate(edge_location_list):
+            #         base_color_map = base_cube[edge_location].facings
+            #         base_set = set()
+            #         for base_key in base_color_map.keys():
+            #             base_set.add(base_color_map[base_key])
+            #         if facings_set == base_set: # 0 ~ 11
+            #             for position_idx, base_key in enumerate(base_color_map):
+            #                 base_color = base_color_map[base_key]
+            #                 if target_face == base_color:
+            #                     state_position = position * 2 + position_idx # 0 ~ 1
+            #                     edge_state[position][state_position] = 1.0
+            # state = np.concatenate([corner_state, edge_state])
         else:
             raise NotImplementedError
         return state
@@ -233,30 +247,47 @@ class CubeEnv(gym.Env):
                 next_state_list.append(next_state)
                 reward_list.append(reward)
             elif self.cube_size == 3:
+                start_time = time.time()
                 sim_action = self.action_to_sim_action[self.cube_size][action]
-                
-                # next_sim_cube = self.sim_cube.perform_step(sim_action)
-                # next_state = self.sim_state_to_state(next_sim_cube)
-                
-                if action % 2 == 0:
-                    counter_action = action + 1
-                else:
-                    counter_action = action - 1
-
-                
-                # if isSolved_(next_sim_cube):
-                if isSolved_(self.sim_cube.perform_step(sim_action)):
+                next_sim_cube = doMove_3(self.sim_cube, sim_action)
+                next_state = self.sim_state_to_state(next_sim_cube)
+                if isSolved_3(next_sim_cube):
                     reward = 1.0
                     target_value, target_policy = 1.0, action
                     break
                 else:
                     reward = -1.0
-
-                # next_state = self.sim_state_to_state(self.sim_cube)
-                next_state_list.append(self.sim_state_to_state(self.sim_cube))
-                self.sim_cube.perform_step(self.action_to_sim_action[self.cube_size][counter_action])
-                
+                next_state_list.append(next_state)
                 reward_list.append(reward)
+                
+                
+                # next_sim_cube = self.sim_cube.perform_step(sim_action)
+                # next_state = self.sim_state_to_state(next_sim_cube)
+                
+                # if action % 2 == 0:
+                #     counter_action = action + 1
+                # else:
+                #     counter_action = action - 1
+
+                # before_solved_time = time.time() - start_time
+                # if isSolved_(next_sim_cube):
+                # if isSolved_(self.sim_cube.perform_step(sim_action)):
+                #     reward = 1.0
+                #     target_value, target_policy = 1.0, action
+                #     break
+                # else:
+                #     reward = -1.0
+                # solved_time = time.time() - start_time
+                # print("Solved and Action Time: ", solved_time - before_solved_time)
+                # next_state = self.sim_state_to_state(self.sim_cube)
+                # next_state_list.append(self.sim_state_to_state(self.sim_cube))
+                # conversion_time = time.time() - start_time
+                # print("Conversion Time: ", conversion_time - solved_time)
+                # self.sim_cube.perform_step(self.action_to_sim_action[self.cube_size][counter_action])
+                # counter_action_time = time.time() - start_time
+                # print("Counter Action Time: ", counter_action_time - conversion_time)
+                
+                # reward_list.append(reward)
             else:
                 raise NotImplementedError
         if reward != 1.0:
@@ -270,7 +301,10 @@ class CubeEnv(gym.Env):
         weight = scramble_count ** (-1*temperature)
         with torch.no_grad():
             state_tensor = torch.tensor(self.cube, device=self.device).float()
+            start_time = time.time()
             value, _ = model(state_tensor)
+            model_time = time.time() - start_time
+            print("Model Time: ", model_time)
             error = abs(value.detach().item() - target_value)
         return target_value, target_policy, error
     

@@ -12,6 +12,7 @@ gym_cube/envs/assets/cube.py
 gym_cube/envs/assets/cube_interactive.py
 gym_cube/envs/assets/cube_utils.py
 gym_cube/envs/assets/projection.py
+gym_cube/envs/assets/py333.py
 gym_cube/envs/assets/PyCuber/pycuber/cube/components.py
 gym_cube/envs/assets/PyCuber/pycuber/cube/constants.py
 gym_cube/envs/assets/PyCuber/pycuber/cube/cube_abc.py
