@@ -7,7 +7,7 @@ from tqdm import tqdm
 import numpy as np
 import torch
 
-from mcts import MCTS
+from mcts import MCTS, MCTS2
 from model import DeepCube
 from env import make_env
 from utils import ReplayBuffer, get_env_config, loss_func, optim_func, scheduler_func,\
@@ -72,7 +72,7 @@ def train(cfg, args):
             env.get_random_samples(replay_buffer, deepcube, sample_scramble_count, sample_cube_count, temperature)
         loss = update_params(deepcube, replay_buffer, criterion_list, optimizer, batch_size, device, temperature)
         loss_history[epoch]['loss'].append(loss)
-        if epoch % validation_epoch == 0:
+        if epoch % validation_epoch == 1:
             validation(deepcube, env, valid_history, epoch, device, cfg)
             plot_valid_hist(valid_history, save_file_path=progress_path, validation_epoch=validation_epoch)
             save_model(deepcube, epoch, optimizer, lr_scheduler, model_path)
@@ -103,26 +103,23 @@ def validation(model, env, valid_history, epoch, device, cfg):
                 # env.render()
                 pass
             state, done = env.reset(seed[idx-1], scramble_count), False
-            mcts = MCTS(model, cfg)
-            solve_time = 1
-            action_list = []
+            mcts = MCTS2(model, cfg)
 
             for timestep in range(0, max_timesteps+1):
                 with torch.no_grad():
-                    action = mcts.getActionProb(state, env, temp=0)
-                action_list.append(action.index(1))
-                next_state, reward, done, info = env.step(action.index(max(action)))
-                if done:
+                    actions = mcts.train(state, env)
+                if actions is not None:
+                    print(actions)
+                    print('solve time:', timestep)
                     solve_count += 1
                     break
-                state = next_state
-                solve_time += 1
+                if timestep == max_timesteps:
+                    print('failed')
+            
             if idx == sample_cube_count and scramble_count==sample_scramble_count: # 마지막 state render종료
                 # env.close_render()
                 pass
-            print(solve_time)
-            print(action_list)
-            print('-------------------')
+
         solve_percentage = (solve_count/sample_cube_count) * 100
         valid_history[epoch]['solve_percentage'].append(solve_percentage)
 
