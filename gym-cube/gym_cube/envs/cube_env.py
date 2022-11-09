@@ -7,7 +7,6 @@ import matplotlib.animation as animation
 from assets.cube_interactive import Cube as RenderCube
 from assets.py222.py222 import initState, getOP, doMove, isSolved, getStickers, printCube
 from utils import *
-from assets.cube_utils import isSolved_
 from assets.py333 import initState_3, doMove_3, getOP_3, isSolved_3, pos_to_state_3
 
 class CubeEnv(gym.Env):

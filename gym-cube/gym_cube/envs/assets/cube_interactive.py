@@ -16,7 +16,6 @@ from projection import Quaternion, project_points
 import torch
 import gym
 
-from cube_utils import isSolved_
 from model import DeepCube
 from env import make_env
 
