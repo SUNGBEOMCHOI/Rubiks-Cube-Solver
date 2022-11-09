@@ -378,7 +378,7 @@ class InteractiveCube(plt.Axes):
     def rotate(self, rot):
         self._current_rot = self._current_rot * rot
 
-    def rotate_face(self, face, turns=1, layer=0, steps=5):
+    def rotate_face(self, face, turns=1, layer=0, steps=15):
         if not np.allclose(turns, 0):
             for i in range(steps):
                 self.cube.rotate_face(face, turns * 1. / steps,
@@ -432,7 +432,7 @@ class InteractiveCube(plt.Axes):
     def _solve_cube(self, *args):
         move_list = self.cube._move_list[:]
         for (face, n, layer) in move_list[::-1]:
-            self.rotate_face(face, -n, layer, steps=3)
+            self.rotate_face(face, -n, layer, steps=15)
         self.cube._move_list = []
 
     def _key_press(self, event):

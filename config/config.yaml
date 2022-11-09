@@ -1,14 +1,14 @@
 train:
-  batch_size: 512
+  batch_size: 1024
   sample_size: 10000
   learning_rate: 0.00005
-  epochs: 140000
+  epochs: 100000
   sample_epoch: 1
   sample_scramble_count: 30
-  sample_cube_count: 100
+  sample_cube_count: 200
   buffer_size: 20000
   temperature: 1.0
-  validation_epoch: 1400
+  validation_epoch: 500
   num_processes: 14
   video_path: ./video
   model_path: ./pretrained
@@ -29,11 +29,12 @@ mcts:
   numMCTSSim: 50
   cpuct: 1.0
   virtual_loss_const: 150
+  value_min: -10.0
 test:
   cube_size: 3
   test_model_path: './test/model'
   save_file_path: './test'
   max_timesteps: 200
   show_scramble_count: 100
-  masks: 'both' # ['x', 'both', 'only']
-  mcts_: 'x' # ['x', 'both', 'only']
+  masks: 'x' # ['x', 'both', 'only']
+  mcts_: 'only' # ['x', 'both', 'only']

@@ -1,6 +1,5 @@
 import argparse
 import matplotlib.patches as mpatches
-import winsound as sd
 
 import torch
 import os
@@ -123,6 +122,7 @@ def trial(model, env, cfg, scramble_count, seed = None, mask=False, mcts_=False)
         trial_result: True or False
     """
     max_timesteps = cfg['test']['max_timesteps']
+    numMCTSSim = cfg['mcts']['numMCTSSim']
     solve_scramble_count, solve_time_time, trial_result = 0, 0, 0
     state, done, pre_action = env.reset(seed=seed, scramble_count=scramble_count), False, None
     start_time = time.time()
@@ -141,10 +141,14 @@ def trial(model, env, cfg, scramble_count, seed = None, mask=False, mcts_=False)
                 action_list.append(action)
             next_state, _, done, _ = env.step(action)
         else:
-            with torch.no_grad():
-                action = mcts.getActionProb(state, env, temp=0)
-            action_list.append(action.index(1))
-            next_state, _, done, _ = env.step(action.index(max(action)))
+            for _ in range(numMCTSSim):
+                with torch.no_grad():
+                    action = mcts.train(state, env) # if solved, action is sequence of action(list type) else None
+                if action is not None:
+                    done = True
+                    break
+                else:
+                    done = False
         if done:
             solve_scramble_count = timestep
             solve_time_time = time.time() - start_time
@@ -294,11 +298,6 @@ def plot_test_distribution_and_dispersion(env, cfg, device):
         result1[:,idx:idx+1,0:1,:], _ = data_for_plot(deepcube, env, cfg, trial_scramble_count, trial_cube_count, mask=option[1], mcts_=option[2], iter=False)
     plot_ditribution_dispersion(result1, options, colors_list, save_file_path)
 
-def beepsound():
-    fr = 2000    # range : 37 ~ 32767
-    du = 1000     # 1000 ms ==1second
-    sd.Beep(fr, du) # winsound.Beep(frequency, duration)
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--pretrained_model', type=str, default='', help='Path to pretrained model file')
@@ -307,4 +306,3 @@ if __name__ == "__main__":
     with open('./config/config.yaml') as f:
         cfg = yaml.safe_load(f)
     test(cfg, mode = 'save')
-    beepsound()

@@ -1,23 +1,18 @@
-import os
-import sys
-import math
 import gym
 import numpy as np
+
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-from collections import namedtuple
 from assets.cube_interactive import Cube as RenderCube
 from assets.py222.py222 import initState, getOP, doMove, isSolved, getStickers, printCube
-# from assets.PyCuber.pycuber.cube import Cube, Cubie, Centre, Corner, Edge, Square, Step, Formula
-import pycuber as pc
 from utils import *
 from assets.cube_utils import isSolved_
 from assets.py333 import initState_3, doMove_3, getOP_3, isSolved_3, pos_to_state_3
 
 class CubeEnv(gym.Env):
     metadata = {'render_modes': ['human', 'rgb_array']}
-    def __init__(self, device, cube_size):
+    def __init__(self, device, cube_size=2):
         """
         Gym environment for cube
 
@@ -25,7 +20,6 @@ class CubeEnv(gym.Env):
             device: Torch device for training, eg.torch.device('cpu:0')
             cube_size: Cube size you want to make environment
         """
-        # self.transaction = namedtuple('Sample', ['state', 'target_value', 'target_policy', 'scramble_count', 'error'])
         self.cube_size = cube_size
         self.device = device
         self.action_to_sim_action = {\
@@ -36,7 +30,6 @@ class CubeEnv(gym.Env):
         self.show_cube = False
         self.state_dim, self.action_dim = get_env_config(cube_size)
         self.init_state()
-        self.frames = []
     
     def init_state(self):
         """
@@ -46,7 +39,6 @@ class CubeEnv(gym.Env):
             self.sim_cube = initState() # py222
             self.cube = self.sim_state_to_state(self.sim_cube)
         elif self.cube_size == 3:
-            # self.sim_cube = pc.Cube()
             self.sim_cube = initState_3()
             self.cube = self.sim_state_to_state(self.sim_cube)
         else:
@@ -56,7 +48,7 @@ class CubeEnv(gym.Env):
             self.render_cube.env = self
             self.fig = self.render_cube.draw_interactive()        
 
-    def reset(self, seed = None, scramble_count = 2):
+    def reset(self, seed=None, scramble_count=2):
         """
         Reset the state to random scrambled cube
 
@@ -91,7 +83,6 @@ class CubeEnv(gym.Env):
             done: Return true if state is goal state, else return false
             info: Dictionary of useful information
         """
-        info = {}
         if self.cube_size == 2:
             sim_action = self.action_to_sim_action[self.cube_size][action] # index에 대한 string 반환
             self.sim_cube = doMove(self.sim_cube, sim_action) # 각 string에 맞게 number가 배정되어 있고 이를 move definition 순서에 맞게 state를 변환
@@ -118,45 +109,9 @@ class CubeEnv(gym.Env):
         if self.show_cube:
             face, degree = self.action_to_sim_action['render'][action] # face string , degree number
             self.fig.axes[3].rotate_face(face, degree, layer = 0)
-        return self.cube, reward, done, info
+        return self.cube, reward, done, {}
 
-    def get_next_state(self, state, action):
-        """
-        Get next state corresponding to input state and action
-
-        Args:
-            state: Numpy array of state
-            action: Integer of action you want to perform
-            action can be 0 to 11 which relative to [U,U',F,F',R,R',D,D',B,B',L,L']
-            
-        Returns:
-            next_state
-            done
-        """
-        sim_action = self.action_to_sim_action[self.cube_size][action]
-        sim_state = self.state_to_sim_state(state)
-        if self.cube_size == 2:            
-            next_sim_state = doMove(sim_state, sim_action)
-            next_state = self.sim_state_to_state(next_sim_state)
-            if isSolved(next_sim_state):
-                done = True
-            else:
-                done = False
-        elif self.cube_size == 3:
-            next_sim_state = doMove_3(sim_state, sim_action)
-            next_state = self.sim_state_to_state(next_sim_state)
-            if isSolved_3(next_sim_state):
-                done = True
-            else:
-                done = False
-        else:
-            raise NotImplementedError
-        if self.show_cube:
-            face, degree = self.action_to_sim_action['render'][action] # face string , degree number
-            self.fig.axes[3].rotate_face(face, degree, layer = 0)
-        return next_state, done
-
-    def render(self):
+    def render(self, mode=None):
         """
         Render the environment to the screen
         Make matplot figure and show cube step
@@ -164,6 +119,7 @@ class CubeEnv(gym.Env):
         self.render_cube = RenderCube(self.cube_size)
         self.fig = self.render_cube.draw_interactive()
         self.show_cube=True
+        plt.close()
         return self.fig
     
     def close_render(self):
@@ -171,6 +127,8 @@ class CubeEnv(gym.Env):
         Finish render mode
         """
         self.show_cube = False
+        plt.pause(1)
+        plt.close()
     
     def sim_state_to_state(self, sim_state):
         """
@@ -217,7 +175,7 @@ class CubeEnv(gym.Env):
             raise NotImplementedError
         return sim_state
     
-    def get_random_samples(self, replay_buffer, model, sample_scramble_count, sample_cube_count):
+    def get_random_samples(self, replay_buffer, model, sample_scramble_count, sample_cube_count, temperature):
         """
         Add samples to replay buffer which contain (state, target value, target policy, scramble count, error)  for training
         
@@ -232,12 +190,11 @@ class CubeEnv(gym.Env):
             action_sequence = np.random.randint(self.action_dim, size=sample_scramble_count)
             for scramble_idx, action in enumerate(action_sequence):
                 state, _, _, _ = self.step(action)
-                target_value, target_policy, error = self.get_target_value(model, scramble_idx+1)
-                # sample = self.transaction(state, target_value, target_policy, scramble_idx+1, error)
+                target_value, target_policy, error = self.get_target_value(model, scramble_idx+1, temperature)
                 sample = {'state':state, 'target_value':target_value, 'target_policy':target_policy, 'scramble_count':scramble_idx+1, 'error':error}
                 replay_buffer.append(sample)
 
-    def get_target_value(self, model, scramble_count):
+    def get_target_value(self, model, scramble_count, temperature):
         """
         Return target value and target policy
 
@@ -288,10 +245,11 @@ class CubeEnv(gym.Env):
                 value = next_value.squeeze(dim=-1).detach() + reward_tensor
             target_value, target_policy = torch.max(value, -1, keepdim=True)
             target_value, target_policy = target_value.item(), target_policy.item()
+        weight = scramble_count ** (-1*temperature)
         with torch.no_grad():
             state_tensor = torch.tensor(self.cube, device=self.device).float()
             value, _ = model(state_tensor)
-            error = abs(value.detach().item() - target_value)
+            error = abs(value.detach().item() - target_value) * weight
         return target_value, target_policy, error
     
     def save_video(self, cube_size, scramble_count, sample_cube_count, video_path='./video'):
@@ -305,19 +263,14 @@ class CubeEnv(gym.Env):
             video_path: Path for saving video
         """
         filename = f'cube{cube_size}_scramble{scramble_count}_sample{sample_cube_count}.gif'
-        self.frames = self.fig.axes[3].frames # interactivecube.frames
-        plt.figure(figsize=(self.frames[0].shape[1] / 72.0, self.frames[0].shape[0] / 72.0), dpi=72)
-        patch = plt.imshow(self.frames[0])
+        frames = self.fig.axes[3].frames # interactivecube.frames
+        plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
+        patch = plt.imshow(frames[0])
         plt.axis('off')
 
         def animate(i):
-            patch.set_data(self.frames[i])
+            patch.set_data(frames[i])
 
-        anim = animation.FuncAnimation(plt.gcf(), animate, frames = len(self.frames), interval=0)
-        anim.save(video_path + '/'+ filename, writer='imagemagick', fps=5)
-    
-
-
-
-
-    
+        anim = animation.FuncAnimation(plt.gcf(), animate, frames = len(frames), interval=1)
+        anim.save(video_path + '/'+ filename, writer='imagemagick', fps=60)
+        self.close_render()

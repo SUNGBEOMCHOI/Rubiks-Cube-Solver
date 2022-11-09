@@ -90,36 +90,3 @@ class DeepCube(nn.Module):
         policy = nn.functional.softmax(policy, dim=-1)
 
         return value.numpy()[0], policy.numpy()[0]
-
-    def get_action_with_2step(self, x, env):
-        """
-        Return action corresponding input states by 2 step state prediction
-
-        Args:
-            x: Torch tensor of size [state_dim[0], state_dim[1]]
-            env: Deepcube environment
-        Returns:
-            action: Integer of action
-        """
-        state_list = []
-        for action1 in range(self.action_dim):
-            x = x.numpy()
-            next_state, done = env.get_next_state(x, action1)
-            state_list.append(next_state)
-            if done:
-                break
-            for action2 in range(self.action_dim):
-                next_next_state, done = env.get_next_state(next_state, action2)
-                state_list.append(next_next_state)
-                if done:
-                    break
-            if done:
-                break
-        if done:
-            action = action1
-        else:
-            state_tensor = torch.tensor(np.array(state_list)).detach().float()
-            with torch.no_grad():
-                value, _ = self.forward(state_tensor)
-            action = torch.argmax(value.squeeze(dim=1)).item() // 7
-        return action
