@@ -1,36 +1,39 @@
 train:
-  batch_size: 256
+  batch_size: 512
   sample_size: 10000
-  learning_rate: 0.001
-  epochs: 10000
+  learning_rate: 0.00005
+  epochs: 140000
   sample_epoch: 1
   sample_scramble_count: 30
   sample_cube_count: 100
-  buffer_size: 50000
-  temperature: 0.3
-  validation_epoch: 200
+  buffer_size: 20000
+  temperature: 1.0
+  validation_epoch: 1400
+  num_processes: 14
   video_path: ./video
   model_path: ./pretrained
   progress_path: ./train_progress
 validation:
-  max_timesteps: 3000
+  max_timesteps: 200
   sample_scramble_count: 30
   sample_cube_count: 10
 env:
-  cube_size: 2
+  cube_size: 3
 model:
   hidden_dim:
+    - 1024
     - 256
-    - 64
-    - 32
-device: cuda
+    - 128
+device: cpu
 mcts:
-  numMCTSSim: 100
-  cpuct: 4.0
+  numMCTSSim: 50
+  cpuct: 1.0
   virtual_loss_const: 150
 test:
-  cube_size: 2
+  cube_size: 3
   test_model_path: './test/model'
   save_file_path: './test'
-  max_timesteps: 60
+  max_timesteps: 200
   show_scramble_count: 100
+  masks: 'both' # ['x', 'both', 'only']
+  mcts_: 'x' # ['x', 'both', 'only']
