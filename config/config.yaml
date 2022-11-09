@@ -4,18 +4,18 @@ train:
   learning_rate: 0.001
   epochs: 10
   sample_epoch: 1
-  sample_scramble_count: 3
-  sample_cube_count: 10
-  buffer_size: 50000
-  temperature: 0.3
+  sample_scramble_count: 5
+  sample_cube_count: 50
+  buffer_size: 20000
+  temperature: 0.7
   validation_epoch: 10
   video_path: ./video
   model_path: ./pretrained
   progress_path: ./train_progress
 validation:
-  max_timesteps: 20
+  max_timesteps: 30
   sample_scramble_count: 3
-  sample_cube_count: 5
+  sample_cube_count: 10
 env:
   cube_size: 3
 model:
