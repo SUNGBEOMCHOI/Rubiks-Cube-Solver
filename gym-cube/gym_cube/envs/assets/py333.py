@@ -219,7 +219,6 @@ edge_pieceInds[45] = [11, 0]; edge_pieceInds[54] = [11, 1]
 # pieceInds for edge: [max hash number, [12, 2]]
 
 def initState_3():
-    print("Initiation")
     return np.array([
         0, 0, 0, 0, 0, 0, 0, 0, 0,\
         1, 1, 1, 1, 1, 1, 1, 1, 1,\
@@ -229,7 +228,6 @@ def initState_3():
         5, 5, 5, 5, 5, 5, 5, 5, 5])
     
 def doMove_3(s, move):
-    print("Move: ", move)
     move = moveInds[move]
     return s[moveDefs[move]]
 
@@ -237,14 +235,10 @@ def getOP_3(s):
     try:
         corner_op = corner_pieceInds[np.dot(s[corner_pieceDefs], corner_hashOP)]
     except:
-        print("State")
-        print(s)
         print("Corner error: ", s[corner_pieceDefs])
     try:
         edge_op = edge_pieceInds[np.dot(s[edge_pieceDefs], edge_hashOP)]
     except:
-        print("State")
-        print(s)
         print("Edge error: ", s[edge_pieceDefs])
     return np.concatenate((corner_op, edge_op))
 

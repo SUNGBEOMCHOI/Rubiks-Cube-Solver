@@ -20,6 +20,7 @@ from cube_utils import isSolved_
 from model import DeepCube
 from env import make_env
 from py333 import isSolved_3
+from matplotlib.artist import Artist
 
 """
 Sticker representation
@@ -96,7 +97,7 @@ class Cube:
                      U=y, D=-y)
     # F = y 아닌가?
 
-    def __init__(self, N=3, plastic_color=None, face_colors=None):
+    def __init__(self, env,  N=3, plastic_color=None, face_colors=None):
         self.N = N
         if plastic_color is None:
             self.plastic_color = self.default_plastic_color
@@ -109,7 +110,8 @@ class Cube:
             self.face_colors = face_colors
 
         # env 받아오기
-        self.env = None
+        self.env = env
+        print(self.env.cube_size)
 
         self._move_list = []
         self._initialize_arrays()
@@ -382,7 +384,7 @@ class InteractiveCube(plt.Axes):
     def rotate(self, rot):
         self._current_rot = self._current_rot * rot
 
-    def rotate_face(self, face, turns=1, layer=0, steps=5):
+    def rotate_face(self, face, turns=1, layer=0, steps=10):
         if not np.allclose(turns, 0):
             for i in range(steps):
                 self.cube.rotate_face(face, turns * 1. / steps,
@@ -398,14 +400,23 @@ class InteractiveCube(plt.Axes):
     def _random_view(self, *args):
         self.set_xlim(self._start_xlim)
         self.set_ylim(self._start_ylim)
+        text = self.figure.text(0.4, 0.9,
+                         "Randomizing...",
+                         size=20)
         #  UDLRBF
         face_list = ["U", "D", "L", "R", "B", "F"]
-        for step in range(50): # for mouse click
+        for step in range(5): # for mouse click
             face = face_list[np.random.randint(6)]
-            layer = np.random.randint(3)
+            layer = 0
             self.rotate_face(face, 1, layer, 1)
-
+        plt.pause(0.3)
+        for txt in self.figure.texts:
+            txt.set_visible(False)
     ####################################################
+    # random scramble input button
+
+    #############################
+
     def _my_solve_cube(self, *args):
         '''
         get env
@@ -415,6 +426,9 @@ class InteractiveCube(plt.Axes):
         rotate_face
         state <- new state
         '''
+        text = self.figure.text(0.4, 0.9,
+                         "Solving...",
+                         size=20)
         action_to_sim_action = {'render':[["U",1],["U",-1],["F",1],["F",-1],["R",1],["R",-1],["D",1],["D",-1],["B",1],["B",-1],["L",1],["L",-1]]}
         env = self.cube.env
         device = env.device
@@ -430,6 +444,9 @@ class InteractiveCube(plt.Axes):
             face, degree = action_to_sim_action['render'][action]
             self.rotate_face(face, degree, layer = 0)
             state = env.sim_cube
+        plt.pause(0.3)
+        for txt in self.figure.texts:
+            txt.set_visible(False)
     ####################################################
 
     def _solve_cube(self, *args):
@@ -465,10 +482,20 @@ class InteractiveCube(plt.Axes):
             self.rotate(Quaternion.from_v_theta(self._ax_UD,
                                                 -5 * self._step_UD))
         elif event.key.upper() in 'LRUDBF':
+            
             if self._shift:
                 direction = -1
+                text = self.figure.text(0.4, 0.9,
+                         f"{event.key.upper()}'",
+                         size=20)
             else:
                 direction = 1
+                text = self.figure.text(0.4, 0.9,
+                         f"{event.key.upper()}",
+                         size=20)
+            plt.pause(1)
+            for txt in self.figure.texts:
+                txt.set_visible(False)
             ####################### N -> self.cube.N
             if np.any(self._digit_flags[:self.cube.N]):
                 for d in np.arange(self.cube.N)[self._digit_flags[:self.cube.N]]:

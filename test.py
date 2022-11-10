@@ -27,7 +27,7 @@ def test(cfg, mode = 'show'):
     state_dim, action_dim = get_env_config(cube_size)
     hidden_dim = cfg['model']['hidden_dim']
     deepcube = DeepCube(state_dim, action_dim, hidden_dim).to(device)
-    env = make_env(device, cube_size)
+    env = make_env('cpu', 2)
     test_model_path = cfg['test']['test_model_path']
     save_file_path = cfg['test']['save_file_path']
     show_scramble_count = cfg['test']['show_scramble_count']
@@ -42,25 +42,35 @@ def test(cfg, mode = 'show'):
         print(time.time()-time1)
         pass
     elif mode == 'show': # 화면에 띄우기
-        deepcube.load_state_dict(torch.load(test_model_path + '\\model_7500.pt', map_location = device)['model_state_dict'])
-        _, _, trial_result, action_list = trial(deepcube, env, cfg, show_scramble_count, seed=None, mask=True, save=False)
+        model_name = os.listdir(test_model_path)[0]
+        # deepcube.load_state_dict(torch.load(test_model_path + '/model_99400.pt', map_location = device)['model_state_dict'])
+        deepcube = model_load(test_model_path, model_name, device, state_dim, action_dim)
+        _, _, trial_result, action_list = trial(deepcube, env, cfg, show_scramble_count, seed=None, mask=False, mcts_=False)
         analysis(action_list, trial_result, mode)
         # trial 결과 나왔으니 시뮬레이션 띄우기
+        env.show_cube = True
         env.render()
-        state, done = env.reset(scramble_count = show_scramble_count), False
-        while not done:
-            with torch.no_grad():
-                state_tensor = torch.tensor(state).float().to(device).detach()
-                action = deepcube.get_action(state_tensor)
-            next_state, r, done, i = env.step(action)
-            if done:
-                break
-            state = next_state
+        # state, done = env.reset(scramble_count = show_scramble_count), False
+        # while not done:
+        #     with torch.no_grad():
+        #         state_tensor = torch.tensor(state).float().to(device).detach()
+        #         action = deepcube.get_action(state_tensor)
+        #     next_state, r, done, i = env.step(action)
+        #     if done:
+        #         break
+        #     state = next_state
 
 
         pass
     else : # show랑 save 둘다 아님
         raise ValueError('You can only choose \"show\" or \"save\" as mode factor')
+
+def model_load(test_model_path, model_name, device, state_dim, action_dim):
+    model_state = torch.load(f'{test_model_path}/{model_name}', map_location = device)
+    hidden_dim = [model_state['optimizer_state_dict']['state'][x]['exp_avg'].size(0) for x in [1, 3, 5]]
+    model = DeepCube(state_dim, action_dim, hidden_dim).to(device)
+    model.load_state_dict(model_state['model_state_dict'])
+    return model
 
 def analysis(action_list, trial_result, mode):
     """
@@ -107,7 +117,7 @@ def analysis(action_list, trial_result, mode):
     return result
         
 
-def trial(model, env, cfg, scramble_count, seed = None, mask=True):
+def trial(model, env, cfg, scramble_count, seed = None, mask=False, mcts_=False):
     """
     Try to solve a cube with given state
     Args:
@@ -116,38 +126,51 @@ def trial(model, env, cfg, scramble_count, seed = None, mask=True):
         cfg: Which contains trial configuration
         scramble_count: scramble count
         seed: seed to apply scrambling cube except None (default to None)
-        mask:
+        mask: True or False
+        mcts_: True or False
     Returns:
-        solve_count: count to solve a cube  
-        solve_time: time to solve a cube (sec)
+        solve_scramble_count: count to solve a cube  
+        solve_time_time: time to solve a cube (sec)
         trial_result: True or False
     """
     max_timesteps = cfg['test']['max_timesteps']
-    solve_count, solve_time, trial_result = 0, 0, 0
-    state, done, pre_action = env.reset(seed, scramble_count), False, None
+    numMCTSSim = cfg['mcts']['numMCTSSim']
+    solve_scramble_count, solve_time_time, trial_result = 0, 0, 0
+    state, done, pre_action = env.reset(seed=seed, scramble_count=scramble_count), False, None
     start_time = time.time()
+    if mcts_:
+        mcts = MCTS(model, cfg)
     action_list=[]
     for timestep in range(1, max_timesteps+1):
-        with torch.no_grad():
-            state_tensor = torch.tensor(state).float().detach()
-            if mask:
-                action = model.get_action(state_tensor, pre_action)
-            else:
-                action = model.get_action(state_tensor)
-            action_list.append(action)
-            pre_action = action
-
-        next_state, _, done, _ = env.step(action)
+        if mcts_ == False:
+            with torch.no_grad():
+                state_tensor = torch.tensor(state).float().detach()
+                if mask:
+                    action = model.get_action(state_tensor, pre_action)
+                    pre_action = action
+                else:
+                    action = model.get_action(state_tensor)
+                action_list.append(action)
+            next_state, _, done, _ = env.step(action)
+        else:
+            for _ in range(numMCTSSim):
+                with torch.no_grad():
+                    action = mcts.train(state, env) # if solved, action is sequence of action(list type) else None
+                if action is not None:
+                    done = True
+                    break
+                else:
+                    done = False
         if done:
-            solve_count = timestep
-            solve_time = time.time() - start_time
+            solve_scramble_count = timestep
+            solve_time_time = time.time() - start_time
             trial_result = 1
             break
         state = next_state
         if timestep == max_timesteps:
-            solve_count = None
-            solve_time = time.time() - start_time
-    return solve_count, solve_time, trial_result, action_list
+            solve_scramble_count = None
+            solve_time_time = time.time() - start_time
+    return solve_scramble_count, solve_time_time, trial_result, action_list
 
 def plot_test_solve_percentage(model, env, cfg, device):
     """
@@ -303,4 +326,4 @@ if __name__ == "__main__":
 
     with open('./config/config.yaml') as f:
         cfg = yaml.safe_load(f)
-    test(cfg, mode = 'save')
+    test(cfg, mode = 'show')
