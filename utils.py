@@ -185,14 +185,13 @@ def get_env_config(cube_size=3):
     
     return state_dim, action_dim
 
-def save_model(model, epoch, optimizer, lr_scheduler, model_path='./pretrained'):
+def save_model(model, epoch, optimizer, model_path):
     """
     Save trained model
     Args:
         model: Model you want to save
         epoch: Current epoch
-        optimizer
-        lr_scheduler
+        optimizer: Torch optimizer
         model_path: Path to save model
     """
     torch.save({

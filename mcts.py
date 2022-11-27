@@ -1,4 +1,3 @@
-import logging
 import math
 import random
 import copy
@@ -9,8 +8,6 @@ import numpy as np
 from utils import get_env_config
 
 EPS = 1e-8
-
-log = logging.getLogger(__name__)
 
 class MCTS():
     """
@@ -215,4 +212,4 @@ class MCTS():
             reversed_actions_to_leaf.append(pair[1])
 
         reversed_actions_to_leaf.reverse()
-        return 
+        return reversed_actions_to_leaf

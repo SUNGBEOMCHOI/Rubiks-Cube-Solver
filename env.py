@@ -1,6 +1,4 @@
-from collections import namedtuple
 import gym
-import gym_cube
 
 def make_env(device, cube_size):
     env_name = 'cube-v0'

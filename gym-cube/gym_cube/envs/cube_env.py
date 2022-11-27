@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 from assets.cube_interactive import Cube as RenderCube
-from assets.py222.py222 import initState, getOP, doMove, isSolved, getStickers, printCube
+from assets.py222 import initState, getOP, doMove, isSolved, getStickers, printCube
 from utils import *
 from assets.py333 import initState_3, doMove_3, getOP_3, isSolved_3, pos_to_state_3
 
@@ -43,7 +43,7 @@ class CubeEnv(gym.Env):
         else:
             raise NotImplementedError
         if self.show_cube:
-            self.render_cube = RenderCube(self.cube_size)
+            self.render_cube = RenderCube(N=self.cube_size, env = self)
             self.render_cube.env = self
             self.fig = self.render_cube.draw_interactive()        
 
@@ -115,10 +115,10 @@ class CubeEnv(gym.Env):
         Render the environment to the screen
         Make matplot figure and show cube step
         """
-        self.render_cube = RenderCube(self.cube_size)
+        self.render_cube = RenderCube(N = self.cube_size, env=self)
         self.fig = self.render_cube.draw_interactive()
         self.show_cube=True
-        plt.close()
+        plt.show()
         return self.fig
     
     def close_render(self):
@@ -263,7 +263,7 @@ class CubeEnv(gym.Env):
         """
         filename = f'cube{cube_size}_scramble{scramble_count}_sample{sample_cube_count}.gif'
         frames = self.fig.axes[3].frames # interactivecube.frames
-        plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
+        plt.figure(figsize=(frames[0].shape[1] / 36.0, frames[0].shape[0] / 36.0), dpi=36)
         patch = plt.imshow(frames[0])
         plt.axis('off')
 
@@ -271,5 +271,5 @@ class CubeEnv(gym.Env):
             patch.set_data(frames[i])
 
         anim = animation.FuncAnimation(plt.gcf(), animate, frames = len(frames), interval=1)
-        anim.save(video_path + '/'+ filename, writer='imagemagick', fps=60)
+        anim.save(video_path + '/'+ filename, writer='imagemagick', fps=30)
         self.close_render()

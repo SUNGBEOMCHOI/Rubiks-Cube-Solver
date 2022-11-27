@@ -32,7 +32,7 @@ mcts:
   value_min: -10.0
 test:
   cube_size: 3
-  test_model_path: './test/model'
+  test_model_path: './pretrained'
   save_file_path: './test'
   max_timesteps: 200
   show_scramble_count: 100

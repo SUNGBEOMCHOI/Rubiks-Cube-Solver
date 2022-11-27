@@ -12,4 +12,4 @@ gym_cube/envs/assets/cube.py
 gym_cube/envs/assets/cube_interactive.py
 gym_cube/envs/assets/cube_utils.py
 gym_cube/envs/assets/projection.py
-gym_cube/envs/assets/py222/py222.py
+gym_cube/envs/assets/py222.py

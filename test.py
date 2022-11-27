@@ -47,11 +47,7 @@ def test(cfg, mode = 'show'):
     elif mode == 'show': # 화면에 띄우기
         model_name = os.listdir(test_model_path)[0]
         deepcube = model_load(test_model_path, model_name, device, state_dim, action_dim)
-        time1 = time.time()
-        _, _, trial_result, action_list = trial(deepcube, env, cfg, show_scramble_count, seed=None, mask=False, mcts_=False)
-        analysis(action_list, trial_result, mode)
-        print(time.time()-time1)
-        # trial 결과 나왔으니 시뮬레이션 띄우기 
+        env.render() 
         pass
     else : # show랑 save 둘다 아님
         raise ValueError('You can only choose \"show\" or \"save\" as mode factor')
@@ -153,6 +149,7 @@ def trial(model, env, cfg, scramble_count, seed = None, mask=False, mcts_=False)
             solve_scramble_count = timestep
             solve_time_time = time.time() - start_time
             trial_result = 1
+            action_list = action
             break
         state = next_state
         if timestep == max_timesteps:
@@ -305,4 +302,4 @@ if __name__ == "__main__":
 
     with open('./config/config.yaml') as f:
         cfg = yaml.safe_load(f)
-    test(cfg, mode = 'save')
+    test(cfg, mode = 'show')

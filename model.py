@@ -3,7 +3,6 @@ import copy
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.distributions import Categorical
 
 class DeepCube(nn.Module):
     def __init__(self, state_dim, action_dim, hidden_dim):

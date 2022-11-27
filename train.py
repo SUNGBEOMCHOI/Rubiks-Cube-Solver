@@ -34,7 +34,6 @@ def train(cfg, args):
     temperature = cfg['train']['temperature']
     validation_epoch = cfg['train']['validation_epoch']
     num_processes = cfg['train']['num_processes']
-    video_path = cfg['train']['video_path']
     model_path = cfg['train']['model_path']
     progress_path = cfg['train']['progress_path']
     cube_size = cfg['env']['cube_size']
@@ -44,17 +43,26 @@ def train(cfg, args):
     ############################
     #      Train settings      #
     ############################
-    deepcube = DeepCube(state_dim, action_dim, hidden_dim).to(device)
     if num_processes: # Use multi process
-        deepcube.share_memory() # global model
-        optimizer = optim_func(deepcube, learning_rate)
-        optimizer.share_memory()
-        
         BaseManager.register('defaultdict', defaultdict, DictProxy)
         mgr = BaseManager()
         mgr.start()
         loss_history = mgr.defaultdict(dict)
         valid_history = mgr.defaultdict(dict)
+
+        deepcube = DeepCube(state_dim, action_dim, hidden_dim).to(device)
+        if args.resume:
+            checkpoint = torch.load(args.resume)
+            start_epoch = checkpoint['epoch']+1
+            deepcube.load_state_dict(checkpoint['model_state_dict'])
+            for idx in range(1, start_epoch):
+                loss_history[idx] = {'loss':[0.0]}
+            for idx in range(1, ((start_epoch-1)//validation_epoch)+1):
+                valid_history[idx*validation_epoch] = {'solve_percentage' : [0.0]*sample_scramble_count}
+        deepcube.share_memory() # global model
+        optimizer = optim_func(deepcube, learning_rate)
+        optimizer.share_memory()
+        
     else:
         env = make_env(device, cube_size)
         start_epoch = 1
@@ -62,20 +70,15 @@ def train(cfg, args):
         criterion_list = loss_func()
         optimizer = optim_func(deepcube, learning_rate)
 
-        replay_buffer = ReplayBuffer(buffer_size, sample_size)
+        replay_buffer = ReplayBuffer(buffer_size, sample_size, per=True)
         loss_history = defaultdict(lambda: {'loss':[]})
         valid_history = defaultdict(lambda: {'solve_percentage':[]})
 
-    os.makedirs(video_path, exist_ok=True)
-    os.makedirs(model_path, exist_ok=True)
-    os.makedirs(progress_path, exist_ok=True)
+        if args.resume:
+            checkpoint = torch.load(args.resume, map_location = device)
+            start_epoch = checkpoint['epoch']+1
+            deepcube.load_state_dict(checkpoint['model_state_dict'])
 
-    if args.resume:
-        checkpoint = torch.load(args.path)
-        start_epoch = checkpoint['epoch']+1
-        deepcube.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    
     ############################
     #       train model        #
     ############################
@@ -126,8 +129,6 @@ def single_train(worker_idx, local_epoch_max, global_deepcube, optimizer, valid_
     buffer_size = cfg['train']['buffer_size']
     temperature = cfg['train']['temperature']
     validation_epoch = cfg['train']['validation_epoch']
-    num_processes = cfg['train']['num_processes']
-    video_path = cfg['train']['video_path']
     model_path = cfg['train']['model_path']
     progress_path = cfg['train']['progress_path']
     cube_size = cfg['env']['cube_size']
@@ -182,9 +183,6 @@ def validation(model, env, valid_history, epoch, device, cfg):
     for scramble_count in range(1, sample_scramble_count+1):
         solve_count = 0
         for idx in range(1, sample_cube_count+1):
-            if idx == sample_cube_count and scramble_count==sample_scramble_count: # If you want to watch playing video, you can use env.render()
-                # env.render()
-                pass
             state, done = env.reset(seed=seed[idx-1], scramble_count=scramble_count), False
             for timestep in range(1, max_timesteps+1):
                 with torch.no_grad():
@@ -195,18 +193,16 @@ def validation(model, env, valid_history, epoch, device, cfg):
                     solve_count += 1
                     break
                 state = next_state
-            if idx == sample_cube_count and scramble_count==sample_scramble_count: # If you want to save playing video, you can use env.save_videoo()
-                # env.save_video(cube_size = env.cube_size, scramble_count = scramble_count, sample_cube_count = sample_cube_count, video_path = video_path)
-                pass
         solve_percentage = (solve_count/sample_cube_count) * 100
         solve_percentage_list.append(solve_percentage)
     valid_history[epoch] = {'solve_percentage':solve_percentage_list}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('--config', type=str, default='./config/config.yaml', help='Path to config file')
     parser.add_argument('--resume', type=str, default='', help='Path to pretrained model file')
     args = parser.parse_args()
 
-    with open('./config/config.yaml') as f:
+    with open(args.config) as f:
         cfg = yaml.safe_load(f)
     train(cfg, args)
